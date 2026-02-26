@@ -70,9 +70,14 @@ def scrape_membership_export():
         page = context.new_page()
 
         # --- Login ---
-        print(f"Navigating to login page...")
-        page.goto(LOGIN_URL, wait_until="networkidle", timeout=60000)
-        page.wait_for_timeout(2000)
+        print("Navigating to login page...")
+        # Use domcontentloaded — Salesforce never reaches networkidle
+        page.goto(LOGIN_URL, wait_until="domcontentloaded", timeout=60000)
+
+        # Wait for the login form to actually render
+        print("Waiting for login form...")
+        page.wait_for_selector("input[type='password']", timeout=30000)
+        page.wait_for_timeout(1000)
 
         print("Filling login form...")
         # Find and fill email field
@@ -100,26 +105,44 @@ def scrape_membership_export():
             if "login" in page.url.lower():
                 print("ERROR: Login appears to have failed. Check credentials.")
                 print(f"Current URL: {page.url}")
+                page.screenshot(path="/tmp/debug_login_fail.png")
                 browser.close()
                 sys.exit(1)
             print("Login appears successful (redirected away from login page).")
 
         # --- Navigate to My Chapter ---
         print("Navigating to My Chapter...")
-        page.goto(MY_CHAPTER_URL, wait_until="networkidle", timeout=60000)
-        page.wait_for_timeout(3000)
+        # Use domcontentloaded — Salesforce never reaches networkidle
+        page.goto(MY_CHAPTER_URL, wait_until="domcontentloaded", timeout=60000)
+        print("Page DOM loaded, waiting for content to render...")
 
-        # Make sure the "All Members" tab is active and data is loaded
+        # Wait for the member table to appear (more reliable than fixed timeout)
         try:
-            page.wait_for_selector("text=All Members in My Chapter", timeout=30000)
+            page.wait_for_selector("text=All Members in My Chapter", timeout=45000)
             print("My Chapter page loaded.")
         except Exception:
-            print("Warning: Could not confirm page load, continuing anyway...")
-            page.wait_for_timeout(5000)
+            print("Warning: 'All Members' text not found, trying alternate selectors...")
+            try:
+                # Try waiting for the Export button itself as a sign the page loaded
+                page.wait_for_selector("button:has-text('Export')", timeout=30000)
+                print("Found Export button — page is loaded.")
+            except Exception:
+                print("Warning: Could not confirm page load. Taking debug screenshot...")
+                page.screenshot(path="/tmp/debug_my_chapter.png")
+                print(f"Current URL: {page.url}")
+                page.wait_for_timeout(5000)
 
         # --- Click Export button (the one on the page, not in dialog) ---
         print("Clicking Export button...")
         export_btn = page.locator("button.avonni-button:has-text('Export'), button:has-text('Export')").first
+        try:
+            export_btn.wait_for(timeout=15000)
+        except Exception:
+            print("Export button not found. Taking debug screenshot...")
+            page.screenshot(path="/tmp/debug_no_export_btn.png")
+            browser.close()
+            sys.exit(1)
+
         export_btn.click()
         page.wait_for_timeout(2000)
 
@@ -130,6 +153,7 @@ def scrape_membership_export():
             print("Export dialog opened.")
         except Exception:
             print("Warning: Export dialog may not have opened properly.")
+            page.screenshot(path="/tmp/debug_export_dialog.png")
             page.wait_for_timeout(3000)
 
         # --- Click the Export button inside the dialog (the brand/primary button) ---
