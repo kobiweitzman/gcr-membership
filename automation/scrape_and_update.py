@@ -123,7 +123,6 @@ def scrape_membership_export():
         except Exception:
             print("Warning: 'All Members' text not found, trying alternate selectors...")
             try:
-                # Try waiting for the Export button itself as a sign the page loaded
                 page.wait_for_selector("button:has-text('Export')", timeout=30000)
                 print("Found Export button — page is loaded.")
             except Exception:
@@ -131,6 +130,24 @@ def scrape_membership_export():
                 page.screenshot(path="/tmp/debug_my_chapter.png")
                 print(f"Current URL: {page.url}")
                 page.wait_for_timeout(5000)
+
+        # Wait for actual data rows to load (not just the header)
+        print("Waiting for member data to load in table...")
+        try:
+            # Look for table rows or data cells that indicate members have loaded
+            page.wait_for_selector(
+                "table tbody tr, "                         # standard table rows
+                "[class*='datatable'] [role='row'], "      # SLDS datatable rows
+                "[class*='slds-table'] tbody tr, "         # SLDS table rows
+                "[data-row-key-value]",                    # Lightning datatable rows
+                timeout=30000
+            )
+            page.wait_for_timeout(2000)  # Extra buffer for all rows to render
+            print("Table data loaded.")
+        except Exception:
+            print("Warning: Could not detect table rows. Waiting extra time...")
+            page.wait_for_timeout(10000)
+            page.screenshot(path="/tmp/debug_no_table_rows.png")
 
         # --- Click Export button (the one on the page, not in dialog) ---
         print("Clicking Export button...")
