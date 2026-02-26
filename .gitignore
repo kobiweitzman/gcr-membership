@@ -1,0 +1,20 @@
+
+# Secrets
+.env
+
+# OS files
+.DS_Store
+
+# Temp files
+*.xlsx
+/tmp/
+
+# Netlify
+.netlify/
+
+# Xcode
+*.xcodeproj/
+GCR Membership/
+
+# Node
+node_modules/

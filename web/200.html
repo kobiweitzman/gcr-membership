@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#1a2a4a">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>GCR Membership</title>
+<style>
+:root {
+  --bg-dark: #243456;
+  --bg-mid: #2e426c;
+  --bg-light: #385080;
+  --glass-bg: rgba(255,255,255,0.07);
+  --glass-border: rgba(255,255,255,0.15);
+  --glass-highlight: rgba(255,255,255,0.12);
+  --text: #fff;
+  --text-dim: rgba(255,255,255,0.55);
+  --text-mid: rgba(255,255,255,0.75);
+  --cyan: #32d2f5;
+  --blue: #5b8af5;
+  --indigo: #7b6cf6;
+  --purple: #a855f7;
+  --pink: #ec4899;
+  --orange: #f59e0b;
+  --yellow: #fbbf24;
+  --green: #22c55e;
+  --mint: #34d399;
+  --red: #ef4444;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', system-ui, sans-serif;
+  background: linear-gradient(135deg, var(--bg-dark), var(--bg-mid), var(--bg-light), var(--bg-mid));
+  color: var(--text);
+  min-height: 100dvh;
+  overflow-x: hidden;
+  padding-top: var(--safe-top);
+}
+
+/* Floating orbs */
+body::before, body::after {
+  content: ''; position: fixed; border-radius: 50%; pointer-events: none; z-index: 0;
+}
+body::before {
+  width: 400px; height: 400px; top: -100px; left: -80px;
+  background: radial-gradient(circle, rgba(91,138,245,0.15), transparent 70%);
+}
+body::after {
+  width: 320px; height: 320px; bottom: 20%; right: -60px;
+  background: radial-gradient(circle, rgba(123,108,246,0.12), transparent 70%);
+}
+
+/* Glass card */
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(40px); -webkit-backdrop-filter: blur(40px);
+  border-radius: 20px;
+  border: 1px solid var(--glass-border);
+  position: relative;
+  overflow: hidden;
+}
+.glass::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 50%;
+  background: linear-gradient(to bottom, var(--glass-highlight), transparent);
+  pointer-events: none; border-radius: 20px 20px 0 0;
+}
+
+/* Tabs */
+.tab-bar {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+  display: flex; justify-content: space-around; align-items: center;
+  padding: 8px 0 calc(8px + var(--safe-bottom));
+  background: rgba(20,30,55,0.85);
+  backdrop-filter: blur(30px); -webkit-backdrop-filter: blur(30px);
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+.tab-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  background: none; border: none; color: var(--text-dim); font-size: 10px;
+  padding: 4px 16px; cursor: pointer; transition: color 0.2s;
+}
+.tab-btn.active { color: var(--cyan); }
+.tab-btn svg { width: 24px; height: 24px; fill: currentColor; }
+
+/* Pages */
+.page { display: none; position: relative; z-index: 1; padding: 16px 16px calc(80px + var(--safe-bottom)); min-height: 100dvh; }
+.page.active { display: block; }
+
+/* Shared */
+.section-title { font-size: 15px; font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+.section-title .icon { font-size: 16px; }
+
+/* Stats grid */
+.stats-row { display: flex; gap: 10px; margin-bottom: 16px; }
+.stat-card { flex: 1; padding: 16px 4px; text-align: center; }
+.stat-icon { font-size: 20px; margin-bottom: 6px; }
+.stat-value { font-size: 24px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.stat-label { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
+
+/* Header card */
+.header-card { text-align: center; padding: 20px; margin-bottom: 16px; }
+.header-card h1 { font-size: 24px; font-weight: 800; letter-spacing: -0.5px; }
+.header-card p { font-size: 14px; color: var(--text-dim); margin-top: 4px; }
+
+/* Bar charts */
+.bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.bar-label { font-size: 13px; font-weight: 600; width: 42px; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.bar-track { flex: 1; height: 20px; background: rgba(255,255,255,0.06); border-radius: 6px; overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 6px; transition: width 0.6s ease; }
+.bar-count { font-size: 13px; font-weight: 700; width: 36px; text-align: right; color: var(--text-mid); font-variant-numeric: tabular-nums; }
+
+/* Chapter rows */
+.chapter-row, .member-row {
+  display: flex; align-items: center; gap: 12px; padding: 10px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.05); cursor: pointer;
+  transition: background 0.15s;
+}
+.chapter-row:active, .member-row:active { background: rgba(255,255,255,0.05); border-radius: 12px; }
+.rank-badge {
+  width: 28px; height: 28px; border-radius: 50%; display: flex;
+  align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #fff; flex-shrink: 0;
+}
+.avatar {
+  width: 38px; height: 38px; border-radius: 50%; display: flex;
+  align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0;
+}
+.row-info { flex: 1; min-width: 0; }
+.row-name { font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row-sub { font-size: 12px; color: var(--text-dim); margin-top: 1px; }
+.row-count { font-size: 14px; font-weight: 700; color: var(--text-mid); font-variant-numeric: tabular-nums; }
+.mini-bar { width: 60px; height: 14px; border-radius: 3px; margin-right: 8px; flex-shrink: 0; }
+
+/* Search */
+.search-box {
+  width: 100%; padding: 10px 14px; border-radius: 14px; border: 1px solid var(--glass-border);
+  background: var(--glass-bg); color: var(--text); font-size: 15px; outline: none;
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); margin-bottom: 14px;
+}
+.search-box::placeholder { color: var(--text-dim); }
+
+/* Filters */
+.filter-bar { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+.filter-chip {
+  padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;
+  border: 1px solid var(--glass-border); background: var(--glass-bg); color: var(--text-mid);
+  cursor: pointer; transition: all 0.2s;
+}
+.filter-chip.active { background: var(--cyan); color: #000; border-color: var(--cyan); }
+
+/* Expandable */
+.expandable { cursor: pointer; }
+.expand-content { max-height: 0; overflow: hidden; transition: max-height 0.35s ease; }
+.expand-content.open { max-height: 2000px; }
+.chevron { font-size: 12px; color: var(--text-dim); transition: transform 0.3s; margin-left: auto; }
+.chevron.open { transform: rotate(180deg); }
+
+/* Detail panel */
+.detail-panel {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 200;
+  background: linear-gradient(135deg, var(--bg-dark), var(--bg-mid), var(--bg-light));
+  transform: translateX(100%); transition: transform 0.3s ease;
+  overflow-y: auto; padding: 16px; padding-top: calc(16px + var(--safe-top));
+  padding-bottom: calc(16px + var(--safe-bottom));
+}
+.detail-panel.open { transform: translateX(0); }
+.back-btn {
+  background: var(--glass-bg); border: 1px solid var(--glass-border); color: var(--cyan);
+  padding: 8px 16px; border-radius: 12px; font-size: 14px; cursor: pointer; margin-bottom: 16px;
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+}
+.detail-header { text-align: center; margin-bottom: 20px; }
+.detail-avatar {
+  width: 72px; height: 72px; border-radius: 50%; display: flex;
+  align-items: center; justify-content: center; font-size: 26px; font-weight: 700;
+  margin: 0 auto 12px;
+}
+.detail-name { font-size: 22px; font-weight: 800; }
+.detail-tags { display: flex; gap: 8px; justify-content: center; margin-top: 8px; }
+.tag {
+  padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700;
+}
+.detail-section { margin-top: 16px; padding: 16px; }
+.detail-section h3 { font-size: 14px; font-weight: 700; margin-bottom: 10px; color: var(--text-mid); }
+.detail-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+.detail-row .label { font-size: 14px; color: var(--text-dim); }
+.detail-row .value { font-size: 14px; font-weight: 500; }
+.detail-row a { color: var(--cyan); text-decoration: none; }
+
+/* AZA/BBG split bar */
+.split-bar { display: flex; gap: 3px; height: 36px; margin-bottom: 12px; border-radius: 8px; overflow: hidden; }
+.split-segment { display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #fff; }
+.split-legend { display: flex; justify-content: space-between; }
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-mid); }
+.legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+/* Section group label */
+.group-label { font-size: 13px; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; margin: 16px 0 8px 4px; }
+
+/* Expand detail rows */
+.expand-detail-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 13px; }
+.expand-detail-row .dl { color: var(--text-dim); }
+.expand-detail-row .dv { color: var(--text-mid); font-weight: 600; }
+
+/* Count badge */
+.count-badge { font-size: 13px; color: var(--text-dim); font-weight: 600; }
+
+/* Install banner */
+.install-banner {
+  position: fixed; bottom: 70px; left: 16px; right: 16px; z-index: 150;
+  padding: 14px 18px; display: none; align-items: center; gap: 12px;
+}
+.install-banner.show { display: flex; }
+.install-banner p { flex: 1; font-size: 13px; }
+.install-banner button {
+  background: var(--cyan); color: #000; border: none; padding: 8px 16px;
+  border-radius: 10px; font-weight: 700; font-size: 13px; cursor: pointer;
+}
+.install-close { background: none !important; color: var(--text-dim) !important; font-size: 18px; padding: 4px 8px !important; }
+</style>
+</head>
+<body>
+
+<!-- Tab pages -->
+<div id="dashboard-page" class="page active"></div>
+<div id="chapters-page" class="page"></div>
+<div id="members-page" class="page"></div>
+
+<!-- Member detail panel -->
+<div id="detail-panel" class="detail-panel"></div>
+
+<!-- Chapter detail panel -->
+<div id="chapter-detail-panel" class="detail-panel"></div>
+
+<!-- Tab bar -->
+<nav class="tab-bar">
+  <button class="tab-btn active" data-tab="dashboard">
+    <svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+    Dashboard
+  </button>
+  <button class="tab-btn" data-tab="chapters">
+    <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+    Chapters
+  </button>
+  <button class="tab-btn" data-tab="members">
+    <svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+    Members
+  </button>
+</nav>
+
+<!-- iOS install banner -->
+<div id="install-banner" class="install-banner glass">
+  <p>Add to Home Screen for the full app experience</p>
+  <button onclick="this.parentElement.classList.remove('show');" class="install-close">&times;</button>
+</div>
+
+<script>
+const DATA_URL = 'https://tcbdzuzvazbakfwyioad.supabase.co/storage/v1/object/public/membership/members.json';
+let members = [];
+let chapters = [];
+let currentFilter = { order: null, gradYear: null, search: '' };
+
+// --- Data loading ---
+async function loadData() {
+  try {
+    const cached = localStorage.getItem('gcr_members');
+    if (cached) {
+      members = JSON.parse(cached);
+      processData();
+      renderAll();
+    }
+    const resp = await fetch(DATA_URL);
+    if (resp.ok) {
+      members = await resp.json();
+      localStorage.setItem('gcr_members', JSON.stringify(members));
+      processData();
+      renderAll();
+    }
+  } catch (e) {
+    console.error('Load error:', e);
+    const cached = localStorage.getItem('gcr_members');
+    if (cached) { members = JSON.parse(cached); processData(); renderAll(); }
+  }
+}
+
+function processData() {
+  const map = {};
+  members.forEach(m => {
+    const ch = m.chapterName || 'Unassigned';
+    if (!map[ch]) map[ch] = [];
+    map[ch].push(m);
+  });
+  chapters = Object.entries(map).map(([name, mems]) => ({
+    name, members: mems, count: mems.length,
+    order: name.includes('AZA') ? 'AZA' : name.includes('BBG') ? 'BBG' : 'BBYO'
+  })).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+// --- Helpers ---
+function initials(name) {
+  const p = name.split(' ');
+  return p.length >= 2 ? (p[0][0] + p[1][0]).toUpperCase() : name.substring(0, 2).toUpperCase();
+}
+function orderColor(o) { return o === 'AZA' ? 'var(--cyan)' : o === 'BBG' ? 'var(--pink)' : 'var(--orange)'; }
+function orderBg(o) { return o === 'AZA' ? 'rgba(50,210,245,0.15)' : o === 'BBG' ? 'rgba(236,72,153,0.15)' : 'rgba(245,158,11,0.15)'; }
+function fmtPhone(p) {
+  if (!p) return null;
+  const d = p.replace(/\D/g, '');
+  return d.length === 10 ? `(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}` : p;
+}
+function fmtDate(d) {
+  if (!d) return null;
+  const dt = new Date(d + 'T00:00:00');
+  return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+function gradYears() {
+  const s = new Set(members.map(m => m.gradYear).filter(Boolean));
+  return [...s].sort();
+}
+function yearColor(y) {
+  const map = { '2026': 'var(--red)', '2027': 'var(--orange)', '2028': 'var(--blue)', '2029': 'var(--green)', '2030': 'var(--purple)' };
+  return map[y] || '#888';
+}
+function yearGrad(y) {
+  const map = {
+    '2026': 'linear-gradient(90deg,#ef4444,#f59e0b)', '2027': 'linear-gradient(90deg,#f59e0b,#fbbf24)',
+    '2028': 'linear-gradient(90deg,#5b8af5,#32d2f5)', '2029': 'linear-gradient(90deg,#22c55e,#34d399)',
+    '2030': 'linear-gradient(90deg,#a855f7,#ec4899)'
+  };
+  return map[y] || 'linear-gradient(90deg,#888,#666)';
+}
+
+// --- Dashboard ---
+function renderDashboard() {
+  const total = members.length;
+  const aza = members.filter(m => m.order === 'AZA').length;
+  const bbg = members.filter(m => m.order === 'BBG').length;
+  const now = new Date().getFullYear();
+  const newThisYear = members.filter(m => m.joinDate && new Date(m.joinDate).getFullYear() === now).length;
+  const yrCounts = {};
+  members.forEach(m => { const y = m.gradYear || 'Unknown'; yrCounts[y] = (yrCounts[y] || 0) + 1; });
+  const years = Object.entries(yrCounts).sort((a, b) => a[0].localeCompare(b[0]));
+  const maxYr = Math.max(...years.map(y => y[1]));
+  const topCh = [...chapters].sort((a, b) => b.count - a.count);
+  const maxCh = topCh[0]?.count || 1;
+  const azaPct = total > 0 ? Math.round(aza / total * 100) : 0;
+
+  document.getElementById('dashboard-page').innerHTML = `
+    <div class="glass header-card">
+      <h1>Gold Coast Region</h1>
+      <p>BBYO Membership</p>
+    </div>
+
+    <div class="stats-row">
+      <div class="glass stat-card expandable" onclick="toggleExpand('stats-expand')">
+        <div class="stat-icon" style="color:var(--cyan)">👥</div>
+        <div class="stat-value" style="color:var(--cyan)">${total}</div>
+        <div class="stat-label">Total Members</div>
+      </div>
+      <div class="glass stat-card expandable" onclick="toggleExpand('stats-expand')">
+        <div class="stat-icon" style="color:var(--blue)">🛡️</div>
+        <div class="stat-value" style="color:var(--blue)">${aza}</div>
+        <div class="stat-label">AZA</div>
+      </div>
+      <div class="glass stat-card expandable" onclick="toggleExpand('stats-expand')">
+        <div class="stat-icon" style="color:var(--pink)">💜</div>
+        <div class="stat-value" style="color:var(--pink)">${bbg}</div>
+        <div class="stat-label">BBG</div>
+      </div>
+    </div>
+    <div id="stats-expand" class="expand-content glass" style="padding:14px;margin:-8px 0 16px;border-radius:16px;">
+      <div style="font-size:14px;font-weight:700;margin-bottom:8px;">Membership Breakdown</div>
+      <div class="expand-detail-row"><span class="dl">AZA Members</span><span class="dv">${aza} (${azaPct}%)</span></div>
+      <div class="expand-detail-row"><span class="dl">BBG Members</span><span class="dv">${bbg} (${100 - azaPct}%)</span></div>
+      <div class="expand-detail-row"><span class="dl">AZA Chapters</span><span class="dv">${chapters.filter(c => c.order === 'AZA').length}</span></div>
+      <div class="expand-detail-row"><span class="dl">BBG Chapters</span><span class="dv">${chapters.filter(c => c.order === 'BBG').length}</span></div>
+      ${topCh[0] ? `<div class="expand-detail-row"><span class="dl">Largest Chapter</span><span class="dv">${topCh[0].name}</span></div>` : ''}
+    </div>
+
+    <div class="stats-row">
+      <div class="glass stat-card expandable" onclick="toggleExpand('sec-expand')">
+        <div class="stat-icon" style="color:var(--orange)">🏛️</div>
+        <div class="stat-value" style="color:var(--orange)">${chapters.length}</div>
+        <div class="stat-label">Chapters</div>
+      </div>
+      <div class="glass stat-card expandable" onclick="toggleExpand('sec-expand')">
+        <div class="stat-icon" style="color:var(--green)">✨</div>
+        <div class="stat-value" style="color:var(--green)">${newThisYear}</div>
+        <div class="stat-label">New in ${now}</div>
+      </div>
+    </div>
+    <div id="sec-expand" class="expand-content glass" style="padding:14px;margin:-8px 0 16px;border-radius:16px;">
+      <div style="font-size:14px;font-weight:700;margin-bottom:8px;">Recent Members</div>
+      ${members.filter(m => m.joinDate).sort((a, b) => b.joinDate.localeCompare(a.joinDate)).slice(0, 5).map(m => `
+        <div class="expand-detail-row"><span class="dl">${m.fullName}</span><span class="dv">${fmtDate(m.joinDate)}</span></div>
+      `).join('')}
+    </div>
+
+    <div class="glass expandable" style="padding:16px;margin-bottom:16px;" onclick="toggleExpand('yr-expand')">
+      <div class="section-title">📅 Members by Grad Year <span class="chevron" id="yr-expand-chev">▾</span></div>
+      ${years.map(([y, c]) => `
+        <div class="bar-row">
+          <div class="bar-label">${y}</div>
+          <div class="bar-track"><div class="bar-fill" style="width:${c/maxYr*100}%;background:${yearGrad(y)}"></div></div>
+          <div class="bar-count">${c}</div>
+        </div>
+      `).join('')}
+      <div id="yr-expand" class="expand-content" style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.08);">
+        <div style="font-size:13px;font-weight:700;margin-bottom:8px;">AZA / BBG per Year</div>
+        ${gradYears().map(y => {
+          const a = members.filter(m => m.gradYear === y && m.order === 'AZA').length;
+          const b = members.filter(m => m.gradYear === y && m.order === 'BBG').length;
+          return `<div class="expand-detail-row"><span class="dl">Class of ${y}</span><span class="dv"><span style="color:var(--cyan)">AZA: ${a}</span> &nbsp;<span style="color:var(--pink)">BBG: ${b}</span></span></div>`;
+        }).join('')}
+      </div>
+    </div>
+
+    <div class="glass expandable" style="padding:16px;margin-bottom:16px;" onclick="toggleExpand('ch-expand')">
+      <div class="section-title">🏆 Largest Chapters <span class="chevron" id="ch-expand-chev">▾</span></div>
+      <div id="ch-collapsed">${topCh.slice(0, 6).map((ch, i) => chapterRankRow(ch, i, maxCh)).join('')}</div>
+      <div id="ch-expand" class="expand-content">
+        ${topCh.slice(6).map((ch, i) => chapterRankRow(ch, i + 6, maxCh)).join('')}
+      </div>
+    </div>
+
+    <div class="glass expandable" style="padding:16px;margin-bottom:16px;" onclick="toggleExpand('split-expand')">
+      <div class="section-title">📊 AZA / BBG Split <span class="chevron" id="split-expand-chev">▾</span></div>
+      <div class="split-bar">
+        <div class="split-segment" style="flex:${aza};background:linear-gradient(90deg,var(--cyan),var(--blue));">${aza > 0 ? 'AZA' : ''}</div>
+        <div class="split-segment" style="flex:${bbg};background:linear-gradient(90deg,var(--purple),var(--pink));">${bbg > 0 ? 'BBG' : ''}</div>
+      </div>
+      <div class="split-legend">
+        <div class="legend-item"><div class="legend-dot" style="background:var(--cyan)"></div>AZA: ${aza}</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--pink)"></div>BBG: ${bbg}</div>
+      </div>
+      <div id="split-expand" class="expand-content" style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.08);">
+        <div style="font-size:13px;font-weight:700;margin-bottom:8px;">By Chapter</div>
+        ${topCh.map(ch => {
+          const a = ch.members.filter(m => m.order === 'AZA').length;
+          const b = ch.members.filter(m => m.order === 'BBG').length;
+          return `<div class="expand-detail-row"><span class="dl" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${ch.name}</span>${a ? `<span style="color:var(--cyan);font-weight:700;font-size:12px;margin-left:8px;">${a}</span>` : ''}${b ? `<span style="color:var(--pink);font-weight:700;font-size:12px;margin-left:8px;">${b}</span>` : ''}</div>`;
+        }).join('')}
+      </div>
+    </div>`;
+}
+
+function chapterRankRow(ch, i, maxCh) {
+  const colors = ['linear-gradient(var(--yellow),var(--orange))', 'linear-gradient(#9ca3af,#6b7280)', 'linear-gradient(#d97706,#92400e)'];
+  const bg = i < 3 ? colors[i] : 'linear-gradient(rgba(91,138,245,0.5),rgba(91,138,245,0.3))';
+  const barGrad = ch.order === 'AZA' ? 'linear-gradient(90deg,var(--cyan),var(--blue))' : 'linear-gradient(90deg,var(--pink),var(--purple))';
+  return `<div style="display:flex;align-items:center;gap:10px;padding:6px 0;${i > 0 ? 'border-top:1px solid rgba(255,255,255,0.05);' : ''}">
+    <div class="rank-badge" style="background:${bg};">${i + 1}</div>
+    <div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${ch.name}</div>
+    <div style="font-size:11px;font-weight:600;color:${orderColor(ch.order)}">${ch.order}</div></div>
+    <div class="mini-bar" style="background:${barGrad};width:${ch.count/maxCh*60}px;"></div>
+    <div style="font-size:14px;font-weight:700;color:var(--text-mid);width:30px;text-align:right;">${ch.count}</div>
+  </div>`;
+}
+
+function toggleExpand(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.toggle('open');
+  const chev = document.getElementById(id + '-chev');
+  if (chev) chev.classList.toggle('open');
+}
+
+// --- Chapters ---
+function renderChapters() {
+  const aza = chapters.filter(c => c.order === 'AZA').sort((a, b) => b.count - a.count);
+  const bbg = chapters.filter(c => c.order === 'BBG').sort((a, b) => b.count - a.count);
+  const bbyo = chapters.filter(c => c.order === 'BBYO').sort((a, b) => b.count - a.count);
+
+  document.getElementById('chapters-page').innerHTML = `
+    <input class="search-box" placeholder="Search chapters..." oninput="filterChapters(this.value)">
+    <div id="chapters-list">
+      ${renderChapterGroup('AZA Chapters', aza)}
+      ${renderChapterGroup('BBG Chapters', bbg)}
+      ${bbyo.length ? renderChapterGroup('BBYO Chapters', bbyo) : ''}
+    </div>`;
+}
+
+function renderChapterGroup(label, chs) {
+  if (!chs.length) return '';
+  return `<div class="group-label">${label}</div>` +
+    chs.map(ch => `<div class="chapter-row" onclick="showChapterDetail('${ch.name.replace(/'/g, "\\'")}')">
+      <div class="avatar" style="background:${orderBg(ch.order)};color:${orderColor(ch.order)}">${ch.order}</div>
+      <div class="row-info"><div class="row-name">${ch.name}</div><div class="row-sub">${ch.count} members</div></div>
+      <div class="row-count">&rsaquo;</div>
+    </div>`).join('');
+}
+
+function filterChapters(q) {
+  const ql = q.toLowerCase();
+  const filtered = chapters.filter(c => c.name.toLowerCase().includes(ql));
+  const aza = filtered.filter(c => c.order === 'AZA').sort((a, b) => b.count - a.count);
+  const bbg = filtered.filter(c => c.order === 'BBG').sort((a, b) => b.count - a.count);
+  const bbyo = filtered.filter(c => c.order === 'BBYO').sort((a, b) => b.count - a.count);
+  document.getElementById('chapters-list').innerHTML =
+    renderChapterGroup('AZA Chapters', aza) + renderChapterGroup('BBG Chapters', bbg) + (bbyo.length ? renderChapterGroup('BBYO Chapters', bbyo) : '');
+}
+
+function showChapterDetail(name) {
+  const ch = chapters.find(c => c.name === name);
+  if (!ch) return;
+  const sorted = [...ch.members].sort((a, b) => a.fullName.localeCompare(b.fullName));
+  const yrBreak = {};
+  ch.members.forEach(m => { const y = m.gradYear || 'Unknown'; yrBreak[y] = (yrBreak[y] || 0) + 1; });
+  const panel = document.getElementById('chapter-detail-panel');
+  panel.innerHTML = `
+    <button class="back-btn" onclick="document.getElementById('chapter-detail-panel').classList.remove('open')">← Back</button>
+    <div class="glass" style="padding:16px;text-align:center;margin-bottom:16px;">
+      <div style="font-size:20px;font-weight:800;">${ch.name}</div>
+      <div style="display:flex;justify-content:center;gap:24px;margin-top:12px;">
+        <div><div style="font-size:22px;font-weight:800;color:${orderColor(ch.order)}">${ch.count}</div><div style="font-size:12px;color:var(--text-dim)">Members</div></div>
+        <div><div style="font-size:22px;font-weight:800;color:${orderColor(ch.order)}">${ch.order}</div><div style="font-size:12px;color:var(--text-dim)">Order</div></div>
+      </div>
+    </div>
+    <div class="glass" style="padding:14px;margin-bottom:16px;">
+      <div style="font-size:14px;font-weight:700;margin-bottom:8px;">By Grad Year</div>
+      ${Object.entries(yrBreak).sort().map(([y, c]) => `
+        <div class="expand-detail-row"><span class="dl">Class of ${y}</span><span class="dv">${c}</span></div>
+      `).join('')}
+    </div>
+    <div class="glass" style="padding:14px;">
+      <div style="font-size:14px;font-weight:700;margin-bottom:10px;">Members (${sorted.length})</div>
+      ${sorted.map(m => `<div class="member-row" onclick="event.stopPropagation();showMemberDetail('${m.fullName.replace(/'/g, "\\'")}')">
+        <div class="avatar" style="background:${orderBg(m.order)};color:${orderColor(m.order)}">${initials(m.fullName)}</div>
+        <div class="row-info"><div class="row-name">${m.fullName}</div><div class="row-sub">${m.gradYear ? "'" + m.gradYear.slice(-2) : ''}</div></div>
+      </div>`).join('')}
+    </div>`;
+  panel.classList.add('open');
+}
+
+// --- Members ---
+function renderMembers() {
+  document.getElementById('members-page').innerHTML = `
+    <input class="search-box" id="member-search" placeholder="Search by name, email, chapter..." oninput="filterMembers()">
+    <div class="filter-bar">
+      <div class="filter-chip ${!currentFilter.order ? 'active' : ''}" onclick="setOrderFilter(null)">All</div>
+      <div class="filter-chip ${currentFilter.order==='AZA' ? 'active' : ''}" onclick="setOrderFilter('AZA')">AZA</div>
+      <div class="filter-chip ${currentFilter.order==='BBG' ? 'active' : ''}" onclick="setOrderFilter('BBG')">BBG</div>
+      <select class="search-box" style="margin:0;padding:8px 12px;font-size:13px;width:auto;flex:1;" onchange="setYearFilter(this.value)">
+        <option value="">All Years</option>
+        ${gradYears().map(y => `<option value="${y}" ${currentFilter.gradYear===y?'selected':''}>${y}</option>`).join('')}
+      </select>
+    </div>
+    <div id="members-list"></div>`;
+  filterMembers();
+}
+
+function setOrderFilter(o) { currentFilter.order = o; renderMembers(); }
+function setYearFilter(y) { currentFilter.gradYear = y || null; filterMembers(); }
+
+function filterMembers() {
+  const q = (document.getElementById('member-search')?.value || '').toLowerCase();
+  const filtered = members.filter(m => {
+    if (currentFilter.order && m.order !== currentFilter.order) return false;
+    if (currentFilter.gradYear && m.gradYear !== currentFilter.gradYear) return false;
+    if (q && !m.fullName.toLowerCase().includes(q) && !(m.email||'').toLowerCase().includes(q) && !(m.chapterName||'').toLowerCase().includes(q)) return false;
+    return true;
+  }).sort((a, b) => a.fullName.localeCompare(b.fullName));
+
+  document.getElementById('members-list').innerHTML =
+    `<div class="count-badge" style="margin-bottom:10px;">${filtered.length} members</div>` +
+    filtered.map(m => `<div class="member-row" onclick="showMemberDetail('${m.fullName.replace(/'/g, "\\'")}')">
+      <div class="avatar" style="background:${orderBg(m.order)};color:${orderColor(m.order)}">${initials(m.fullName)}</div>
+      <div class="row-info">
+        <div class="row-name">${m.fullName}</div>
+        <div class="row-sub">${m.chapterName || ''} ${m.gradYear ? " · '" + m.gradYear.slice(-2) : ''}</div>
+      </div>
+      <div class="row-count">&rsaquo;</div>
+    </div>`).join('');
+}
+
+// --- Member detail ---
+function showMemberDetail(name) {
+  const m = members.find(x => x.fullName === name);
+  if (!m) return;
+  const panel = document.getElementById('detail-panel');
+  panel.innerHTML = `
+    <button class="back-btn" onclick="document.getElementById('detail-panel').classList.remove('open')">← Back</button>
+    <div class="detail-header">
+      <div class="detail-avatar" style="background:${orderBg(m.order)};color:${orderColor(m.order)}">${initials(m.fullName)}</div>
+      <div class="detail-name">${m.fullName}</div>
+      <div class="detail-tags">
+        ${m.order ? `<span class="tag" style="background:${orderBg(m.order)};color:${orderColor(m.order)}">${m.order}</span>` : ''}
+        ${m.gradYear ? `<span class="tag" style="background:rgba(91,138,245,0.15);color:var(--blue)">Class of ${m.gradYear}</span>` : ''}
+      </div>
+    </div>
+    ${m.chapterName ? `<div class="glass detail-section"><h3>Chapter</h3><div style="font-size:15px;">${m.chapterName}</div></div>` : ''}
+    <div class="glass detail-section">
+      <h3>Contact</h3>
+      ${m.phone ? `<div class="detail-row"><span class="label">Phone</span><a href="tel:${m.phone}">${fmtPhone(m.phone)}</a></div>` : ''}
+      ${m.email ? `<div class="detail-row"><span class="label">Email</span><a href="mailto:${m.email}">${m.email}</a></div>` : ''}
+    </div>
+    <div class="glass detail-section">
+      <h3>Membership</h3>
+      ${m.joinDate ? `<div class="detail-row"><span class="label">Joined</span><span class="value">${fmtDate(m.joinDate)}</span></div>` : ''}
+      ${m.birthdate ? `<div class="detail-row"><span class="label">Birthday</span><span class="value">${fmtDate(m.birthdate)}</span></div>` : ''}
+      ${m.recommendedProgram ? `<div class="detail-row"><span class="label">Recommended</span><span class="value">${m.recommendedProgram}</span></div>` : ''}
+    </div>
+    ${(m.parent1Name || m.parent2Name) ? `<div class="glass detail-section"><h3>Parents / Guardians</h3>
+      ${m.parent1Name ? `<div style="margin-bottom:10px;"><div style="font-weight:600;">${m.parent1Name}</div>
+        ${m.parent1Email ? `<div><a href="mailto:${m.parent1Email}" style="font-size:13px;color:var(--cyan);">${m.parent1Email}</a></div>` : ''}
+        ${m.parent1Cell ? `<div><a href="tel:${m.parent1Cell}" style="font-size:13px;color:var(--cyan);">${fmtPhone(m.parent1Cell)}</a></div>` : ''}</div>` : ''}
+      ${m.parent2Name ? `<div><div style="font-weight:600;">${m.parent2Name}</div>
+        ${m.parent2Email ? `<div><a href="mailto:${m.parent2Email}" style="font-size:13px;color:var(--cyan);">${m.parent2Email}</a></div>` : ''}
+        ${m.parent2Cell ? `<div><a href="tel:${m.parent2Cell}" style="font-size:13px;color:var(--cyan);">${fmtPhone(m.parent2Cell)}</a></div>` : ''}</div>` : ''}
+    </div>` : ''}`;
+  panel.classList.add('open');
+}
+
+// --- Tabs ---
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.tab + '-page').classList.add('active');
+    // Close any open detail panels
+    document.getElementById('detail-panel').classList.remove('open');
+    document.getElementById('chapter-detail-panel').classList.remove('open');
+  });
+});
+
+// --- Render all ---
+function renderAll() { renderDashboard(); renderChapters(); renderMembers(); }
+
+// --- PWA ---
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js');
+}
+
+// iOS install prompt
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+const isStandalone = window.navigator.standalone === true;
+if (isIOS && !isStandalone) {
+  setTimeout(() => document.getElementById('install-banner').classList.add('show'), 2000);
+}
+
+// Boot
+loadData();
+</script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+{
+  "regionGoal": 1000,
+  "totalNewGoal": 91,
+  "months": ["Jan", "Feb", "Mar", "Apr"],
+  "chapters": {
+    "Acharit BBG #2543": { "monthly": [2, 1, 1, 1], "total": 5 },
+    "Barak AZA #2554": { "monthly": [1, 1, 0, 0], "total": 2 },
+    "Golan AZA #2510": { "monthly": [1, 1, 1, 1], "total": 4 },
+    "Ha'ela BBG #247": { "monthly": [5, 2, 5, 3], "total": 15 },
+    "Halev BBG #2362": { "monthly": [4, 2, 4, 2], "total": 12 },
+    "Hazak AZA #2566": { "monthly": [1, 1, 1, 0], "total": 3 },
+    "Jordan Kronen AZA #222": { "monthly": [4, 2, 3, 1], "total": 10 },
+    "L'Olam BBG #2661": { "monthly": [3, 1, 1, 0], "total": 5 },
+    "Mysteria AZA #2480": { "monthly": [2, 1, 2, 0], "total": 5 },
+    "Simchat HaDerech BBYO #5401": { "monthly": [5, 2, 3, 0], "total": 10 },
+    "Tapuach AZA #2530": { "monthly": [2, 1, 3, 2], "total": 10 },
+    "T'lalim BBG #2378": { "monthly": [3, 1, 2, 0], "total": 6 },
+    "Yafah BBG #2544": { "monthly": [1, 1, 1, 1], "total": 4 }
+  }
+}
