@@ -1,0 +1,38 @@
+name: Update Membership Data
+
+on:
+  schedule:
+    # Runs 4 times a day: 6am, 12pm, 6pm, 12am EST (UTC-5)
+    - cron: "0 11 * * *"
+    - cron: "0 17 * * *"
+    - cron: "0 23 * * *"
+    - cron: "0 5 * * *"
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install openpyxl playwright
+          playwright install chromium
+          playwright install-deps chromium
+
+      - name: Run membership scraper
+        env:
+          BBYO_EMAIL: ${{ secrets.BBYO_EMAIL }}
+          BBYO_PASSWORD: ${{ secrets.BBYO_PASSWORD }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python automation/scrape_and_update.py
