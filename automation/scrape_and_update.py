@@ -57,12 +57,6 @@ SENSITIVE_FIELDS = [
     "parent2Name", "parent2Email", "parent2Cell",
 ]
 
-# Chapter remap: combine Yafah BBG + Zera BBG → Davie BBG #247
-CHAPTER_REMAP = {
-    "Yafah BBG #2544": "Davie BBG #247",
-    "Zera BBG #2530": "Davie BBG #247",
-}
-
 
 # ---------- Scraping ----------
 
@@ -314,10 +308,6 @@ def convert_spreadsheet(input_path):
             "parent2Cell": clean_phone(get(row, "parent2Cell")),
             "recommendedProgram": program,
         }
-        # Apply chapter remap (combine chapters)
-        if member["chapterName"] and member["chapterName"] in CHAPTER_REMAP:
-            member["chapterName"] = CHAPTER_REMAP[member["chapterName"]]
-
         members.append(member)
 
     members.sort(key=lambda m: m["fullName"])
