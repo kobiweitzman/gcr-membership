@@ -1017,39 +1017,18 @@ function showMemberDetail(name) {
 
 // ===== TABS =====
 const tabOrder = ['dashboard','goals','chapters','members'];
-let isAnimating = false;
-
-function switchTab(name, direction) {
+function switchTab(name) {
   const cur = currentTab();
-  if (cur === name || isAnimating) return;
-  if (!direction) direction = tabOrder.indexOf(name) > tabOrder.indexOf(cur) ? 'left' : 'right';
+  if (cur === name) return;
 
-  isAnimating = true;
-  const oldPage = document.getElementById(cur + '-page');
-  const newPage = document.getElementById(name + '-page');
-  const wrapper = document.querySelector('.page-wrapper');
-
-  // Update tab bar immediately
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelector(`.tab-btn[data-tab="${name}"]`).classList.add('active');
   document.getElementById('detail-panel').classList.remove('open');
   document.getElementById('chapter-detail-panel').classList.remove('open');
 
-  // Swap pages: hide old instantly, fade new in
-  oldPage.classList.remove('active');
-  oldPage.style.display = 'none';
+  document.getElementById(cur + '-page').classList.remove('active');
+  document.getElementById(name + '-page').classList.add('active');
   window.scrollTo(0, 0);
-  newPage.classList.add('active');
-  newPage.style.opacity = '0';
-  newPage.offsetHeight;
-  newPage.style.transition = 'opacity 0.15s ease';
-  newPage.style.opacity = '1';
-
-  setTimeout(() => {
-    newPage.style.cssText = '';
-    oldPage.style.display = '';
-    isAnimating = false;
-  }, 180);
 }
 
 function currentTab() { return document.querySelector('.tab-btn.active').dataset.tab; }
@@ -1071,8 +1050,8 @@ document.addEventListener('touchend', e => {
   const dt = Date.now() - touchStartTime;
   if (Math.abs(dx) < 60 || Math.abs(dy) > Math.abs(dx) * 0.7 || dt > 400) return;
   const idx = tabOrder.indexOf(currentTab());
-  if (dx < 0 && idx < tabOrder.length - 1) switchTab(tabOrder[idx + 1], 'left');
-  if (dx > 0 && idx > 0) switchTab(tabOrder[idx - 1], 'right');
+  if (dx < 0 && idx < tabOrder.length - 1) switchTab(tabOrder[idx + 1]);
+  if (dx > 0 && idx > 0) switchTab(tabOrder[idx - 1]);
 }, { passive: true });
 
 function renderAll(){
