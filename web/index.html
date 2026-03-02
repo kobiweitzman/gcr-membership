@@ -149,25 +149,23 @@ body {
 /* ===== PAGES ===== */
 .page-wrapper { position: relative; overflow-x: hidden; min-height: 100dvh; z-index: 1; }
 .page {
-  display: none;
+  position: absolute; top: 0; left: 0; right: 0;
   padding: 16px 16px calc(76px + var(--safe-bottom));
   min-height: 100dvh;
-  position: relative; z-index: 1;
+  visibility: hidden; pointer-events: none;
 }
-.page.active { display: block; }
+.page.active {
+  position: relative; visibility: visible; pointer-events: auto; z-index: 1;
+}
 .page.animating {
-  display: block; position: absolute; top: 0; left: 0; right: 0; z-index: 0;
-  transition: transform 0.32s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.32s ease;
+  visibility: visible; z-index: 0;
+  transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.3s ease;
   will-change: transform, opacity;
 }
-.page.animating.out-left  { transform: translateX(-30%); opacity: 0; }
-.page.animating.out-right { transform: translateX(30%); opacity: 0; }
-.page.animating.in-enter  {
-  z-index: 1; position: relative;
-  animation: slideIn 0.32s cubic-bezier(0.4, 0, 0.2, 1) both;
-}
-@keyframes slideInFromRight { from { transform: translateX(60px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-@keyframes slideInFromLeft  { from { transform: translateX(-60px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+.page.animating.out-left  { transform: translateX(-25%); opacity: 0; }
+.page.animating.out-right { transform: translateX(25%); opacity: 0; }
+@keyframes slideInFromRight { from { transform: translateX(50px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+@keyframes slideInFromLeft  { from { transform: translateX(-50px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 
 /* ===== HEADER ===== */
 .header-card { text-align: center; padding: 22px 20px; margin-bottom: 14px; }
@@ -1047,24 +1045,28 @@ function switchTab(name, direction) {
   document.getElementById('detail-panel').classList.remove('open');
   document.getElementById('chapter-detail-panel').classList.remove('open');
 
-  // Animate old page out (absolute so it doesn't affect layout)
+  // 1) Make new page visible but off-screen so browser can layout it
+  newPage.style.visibility = 'visible';
+  newPage.offsetHeight; // force layout — no jank during animation
+
+  // 2) Animate old page out
   oldPage.classList.remove('active');
   oldPage.classList.add('animating');
   oldPage.style.transform = 'translateX(0)'; oldPage.style.opacity = '1';
   oldPage.offsetHeight;
   oldPage.classList.add(direction === 'left' ? 'out-left' : 'out-right');
 
-  // Show new page with slide-in animation
+  // 3) Slide new page in
   newPage.classList.add('active');
-  newPage.style.animation = `${anim} 0.32s cubic-bezier(0.4,0,0.2,1) both`;
+  newPage.style.animation = `${anim} 0.3s cubic-bezier(0.25,1,0.5,1) both`;
   window.scrollTo(0, 0);
 
   setTimeout(() => {
     oldPage.classList.remove('animating', 'out-left', 'out-right');
-    oldPage.style.transform = ''; oldPage.style.opacity = '';
-    newPage.style.animation = '';
+    oldPage.style.transform = ''; oldPage.style.opacity = ''; oldPage.style.visibility = '';
+    newPage.style.animation = ''; newPage.style.visibility = '';
     isAnimating = false;
-  }, 340);
+  }, 320);
 }
 
 function currentTab() { return document.querySelector('.tab-btn.active').dataset.tab; }
