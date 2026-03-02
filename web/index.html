@@ -1107,21 +1107,8 @@ document.addEventListener('touchend', e => {
 const splashStart = Date.now();
 const SPLASH_MIN_MS = 1800; // minimum time splash is shown
 let firstRender = true;
-let chartObserver = null;
 function renderAll(){
   renderDashboard();updateJoinChart();try{renderGoals();}catch(e){}renderChapters();renderMembers();
-  // Watch chart container for size changes (handles splash reveal + rotation)
-  if (!chartObserver) {
-    const cc = document.getElementById('join-chart-container');
-    if (cc) {
-      let lastW = 0;
-      chartObserver = new ResizeObserver(entries => {
-        const w = entries[0].contentRect.width;
-        if (w > 0 && w !== lastW) { lastW = w; updateJoinChart(); }
-      });
-      chartObserver.observe(cc);
-    }
-  }
   if (firstRender) {
     firstRender = false;
     const elapsed = Date.now() - splashStart;
@@ -1209,6 +1196,14 @@ if(isIOS&&!window.navigator.standalone) setTimeout(()=>document.getElementById('
 // Request notification permission shortly after load
 setTimeout(requestNotificationPermission, 3000);
 loadData();
+
+// Observe dashboard-page (static element) for width changes.
+// Fires when splash dismisses and content becomes visible, and on rotation.
+let _dashW = 0;
+new ResizeObserver(entries => {
+  const w = entries[0].contentRect.width;
+  if (w > 0 && w !== _dashW) { _dashW = w; updateJoinChart(); }
+}).observe(document.getElementById('dashboard-page'));
 </script>
 </body>
 </html>
