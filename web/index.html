@@ -324,6 +324,7 @@ body {
 /* ===== ANIMATIONS ===== */
 @keyframes slideUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
 .anim { animation: slideUp 0.5s cubic-bezier(0.16,1,0.3,1) both; }
+.anim-done { animation: none !important; opacity: 1 !important; transform: none !important; }
 .d1{animation-delay:.04s} .d2{animation-delay:.08s} .d3{animation-delay:.12s} .d4{animation-delay:.16s} .d5{animation-delay:.20s} .d6{animation-delay:.24s}
 </style>
 </head>
@@ -1074,7 +1075,13 @@ document.addEventListener('touchend', e => {
   if (dx > 0 && idx > 0) switchTab(tabOrder[idx - 1], 'right');
 }, { passive: true });
 
-function renderAll(){renderDashboard();updateJoinChart();try{renderGoals();}catch(e){}renderChapters();renderMembers();}
+function renderAll(){
+  renderDashboard();updateJoinChart();try{renderGoals();}catch(e){}renderChapters();renderMembers();
+  // After first render, disable staggered animations so tab switches are instant
+  setTimeout(() => {
+    document.querySelectorAll('.anim').forEach(el => el.classList.add('anim-done'));
+  }, 700);
+}
 
 // ===== NEW MEMBER NOTIFICATIONS =====
 function requestNotificationPermission() {
