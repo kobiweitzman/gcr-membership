@@ -147,25 +147,14 @@ body {
 .tab-btn svg { width: 22px; height: 22px; fill: currentColor; }
 
 /* ===== PAGES ===== */
-.page-wrapper { position: relative; overflow-x: hidden; min-height: 100dvh; z-index: 1; }
+.page-wrapper { position: relative; overflow: hidden; min-height: 100dvh; z-index: 1; }
 .page {
   position: absolute; top: 0; left: 0; right: 0;
   padding: 16px 16px calc(76px + var(--safe-bottom));
   min-height: 100dvh;
   visibility: hidden; pointer-events: none;
 }
-.page.active {
-  position: relative; visibility: visible; pointer-events: auto; z-index: 1;
-}
-.page.animating {
-  visibility: visible; z-index: 0;
-  transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.3s ease;
-  will-change: transform, opacity;
-}
-.page.animating.out-left  { transform: translateX(-25%); opacity: 0; }
-.page.animating.out-right { transform: translateX(25%); opacity: 0; }
-@keyframes slideInFromRight { from { transform: translateX(50px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-@keyframes slideInFromLeft  { from { transform: translateX(-50px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+.page.active { position: relative; visibility: visible; pointer-events: auto; }
 
 /* ===== HEADER ===== */
 .header-card { text-align: center; padding: 22px 20px; margin-bottom: 14px; }
@@ -1037,36 +1026,36 @@ function switchTab(name, direction) {
   isAnimating = true;
   const oldPage = document.getElementById(cur + '-page');
   const newPage = document.getElementById(name + '-page');
-  const anim = direction === 'left' ? 'slideInFromRight' : 'slideInFromLeft';
+  const wrapper = document.querySelector('.page-wrapper');
 
-  // Update tab bar
+  // Update tab bar immediately
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelector(`.tab-btn[data-tab="${name}"]`).classList.add('active');
   document.getElementById('detail-panel').classList.remove('open');
   document.getElementById('chapter-detail-panel').classList.remove('open');
 
-  // 1) Make new page visible but off-screen so browser can layout it
-  newPage.style.visibility = 'visible';
-  newPage.offsetHeight; // force layout — no jank during animation
+  // Lock wrapper height so layout doesn't jump
+  wrapper.style.height = wrapper.offsetHeight + 'px';
 
-  // 2) Animate old page out
-  oldPage.classList.remove('active');
-  oldPage.classList.add('animating');
-  oldPage.style.transform = 'translateX(0)'; oldPage.style.opacity = '1';
-  oldPage.offsetHeight;
-  oldPage.classList.add(direction === 'left' ? 'out-left' : 'out-right');
-
-  // 3) Slide new page in
+  // Place new page on top, positioned off-screen
+  const startX = direction === 'left' ? '100%' : '-100%';
+  newPage.style.cssText = 'position:absolute;top:0;left:0;right:0;visibility:visible;pointer-events:auto;z-index:2;transform:translateX(' + startX + ');';
   newPage.classList.add('active');
-  newPage.style.animation = `${anim} 0.3s cubic-bezier(0.25,1,0.5,1) both`;
+  newPage.offsetHeight; // pre-render
+
+  // Animate new page sliding in
+  newPage.style.transition = 'transform 0.3s cubic-bezier(0.25, 1, 0.5, 1)';
+  newPage.style.transform = 'translateX(0)';
   window.scrollTo(0, 0);
 
   setTimeout(() => {
-    oldPage.classList.remove('animating', 'out-left', 'out-right');
-    oldPage.style.transform = ''; oldPage.style.opacity = ''; oldPage.style.visibility = '';
-    newPage.style.animation = ''; newPage.style.visibility = '';
+    // Clean up — new page becomes the normal active page
+    oldPage.classList.remove('active');
+    oldPage.style.cssText = '';
+    newPage.style.cssText = '';
+    wrapper.style.height = '';
     isAnimating = false;
-  }, 320);
+  }, 310);
 }
 
 function currentTab() { return document.querySelector('.tab-btn.active').dataset.tab; }
