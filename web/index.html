@@ -326,11 +326,61 @@ body {
 .anim { animation: slideUp 0.5s cubic-bezier(0.16,1,0.3,1) both; }
 .anim-done { animation: none !important; opacity: 1 !important; transform: none !important; }
 .d1{animation-delay:.04s} .d2{animation-delay:.08s} .d3{animation-delay:.12s} .d4{animation-delay:.16s} .d5{animation-delay:.20s} .d6{animation-delay:.24s}
+
+/* ===== SPLASH SCREEN ===== */
+@keyframes splashSpin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+@keyframes splashPulse {
+  0%, 100% { filter: drop-shadow(0 0 20px rgba(50,210,245,0.4)) drop-shadow(0 0 60px rgba(91,138,245,0.2)); }
+  50% { filter: drop-shadow(0 0 35px rgba(50,210,245,0.6)) drop-shadow(0 0 80px rgba(91,138,245,0.35)); }
+}
+@keyframes splashExitSpin {
+  0% { transform: rotate(0deg) scale(1); opacity: 1; }
+  70% { transform: rotate(1080deg) scale(1.1); opacity: 1; }
+  100% { transform: rotate(1440deg) scale(0); opacity: 0; }
+}
+@keyframes splashFadeOut {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+.splash-screen {
+  position: fixed; inset: 0; z-index: 9999;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: var(--bg-1);
+}
+.splash-logo {
+  width: 120px; height: 120px; border-radius: 28px;
+  animation: splashSpin 3s linear infinite, splashPulse 2s ease-in-out infinite;
+}
+.splash-logo.exit {
+  animation: splashExitSpin 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+.splash-screen.exit {
+  animation: splashFadeOut 0.3s ease 0.4s forwards;
+}
+.splash-text {
+  margin-top: 24px; font-size: 14px; font-weight: 600;
+  color: var(--text-mid); letter-spacing: 1px; text-transform: uppercase;
+}
+.splash-dots::after {
+  content: ''; animation: dots 1.2s steps(4, end) infinite;
+}
+@keyframes dots {
+  0% { content: ''; } 25% { content: '.'; } 50% { content: '..'; } 75% { content: '...'; }
+}
 </style>
 </head>
 <body>
 
 <!-- Background -->
+<!-- Splash Screen -->
+<div class="splash-screen" id="splash">
+  <img src="icon-512.png" class="splash-logo" id="splash-logo" alt="BBYO">
+  <div class="splash-text">Loading<span class="splash-dots"></span></div>
+</div>
+
 <div class="bg-canvas"></div>
 <div class="orb orb-1"></div>
 <div class="orb orb-2"></div>
@@ -338,7 +388,7 @@ body {
 <div class="orb orb-4"></div>
 
 <!-- Pages -->
-<div class="page-wrapper">
+<div class="page-wrapper" style="display:none" id="main-content">
   <div id="dashboard-page" class="page active"></div>
   <div id="goals-page" class="page"></div>
   <div id="chapters-page" class="page"></div>
@@ -348,7 +398,7 @@ body {
 <div id="chapter-detail-panel" class="detail-panel"></div>
 
 <!-- Tab bar -->
-<nav class="tab-bar">
+<nav class="tab-bar" id="tab-bar" style="display:none">
   <button class="tab-btn active" data-tab="dashboard">
     <svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
     Dashboard
@@ -1054,11 +1104,34 @@ document.addEventListener('touchend', e => {
   if (dx > 0 && idx > 0) switchTab(tabOrder[idx - 1]);
 }, { passive: true });
 
+const splashStart = Date.now();
+const SPLASH_MIN_MS = 1800; // minimum time splash is shown
+let firstRender = true;
 function renderAll(){
   renderDashboard();updateJoinChart();try{renderGoals();}catch(e){}renderChapters();renderMembers();
-  // After first render, disable staggered animations so tab switches are instant
+  if (firstRender) {
+    firstRender = false;
+    const elapsed = Date.now() - splashStart;
+    const remaining = Math.max(0, SPLASH_MIN_MS - elapsed);
+    setTimeout(dismissSplash, remaining);
+  }
+}
+function dismissSplash() {
+  const splash = document.getElementById('splash');
+  const logo = document.getElementById('splash-logo');
+  if (!splash) return;
+  // Fast spin + shrink the logo
+  logo.classList.add('exit');
+  splash.classList.add('exit');
+  // After exit animation, remove splash and show content
   setTimeout(() => {
-    document.querySelectorAll('.anim').forEach(el => el.classList.add('anim-done'));
+    splash.remove();
+    document.getElementById('main-content').style.display = '';
+    document.getElementById('tab-bar').style.display = '';
+    // Disable staggered animations so tab switches are instant
+    setTimeout(() => {
+      document.querySelectorAll('.anim').forEach(el => el.classList.add('anim-done'));
+    }, 800);
   }, 700);
 }
 
