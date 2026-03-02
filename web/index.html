@@ -1107,8 +1107,21 @@ document.addEventListener('touchend', e => {
 const splashStart = Date.now();
 const SPLASH_MIN_MS = 1800; // minimum time splash is shown
 let firstRender = true;
+let chartObserver = null;
 function renderAll(){
   renderDashboard();updateJoinChart();try{renderGoals();}catch(e){}renderChapters();renderMembers();
+  // Watch chart container for size changes (handles splash reveal + rotation)
+  if (!chartObserver) {
+    const cc = document.getElementById('join-chart-container');
+    if (cc) {
+      let lastW = 0;
+      chartObserver = new ResizeObserver(entries => {
+        const w = entries[0].contentRect.width;
+        if (w > 0 && w !== lastW) { lastW = w; updateJoinChart(); }
+      });
+      chartObserver.observe(cc);
+    }
+  }
   if (firstRender) {
     firstRender = false;
     const elapsed = Date.now() - splashStart;
@@ -1128,8 +1141,6 @@ function dismissSplash() {
     splash.remove();
     document.getElementById('main-content').style.display = '';
     document.getElementById('tab-bar').style.display = '';
-    // Wait for layout to compute real widths, then re-render chart
-    requestAnimationFrame(() => { requestAnimationFrame(() => { updateJoinChart(); }); });
     // Disable staggered animations so tab switches are instant
     setTimeout(() => {
       document.querySelectorAll('.anim').forEach(el => el.classList.add('anim-done'));
