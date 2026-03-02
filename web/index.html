@@ -332,9 +332,9 @@ body {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
-@keyframes splashPulse {
-  0%, 100% { filter: drop-shadow(0 0 20px rgba(50,210,245,0.4)) drop-shadow(0 0 60px rgba(91,138,245,0.2)); }
-  50% { filter: drop-shadow(0 0 35px rgba(50,210,245,0.6)) drop-shadow(0 0 80px rgba(91,138,245,0.35)); }
+@keyframes splashGlow {
+  0%, 100% { transform: scale(1); opacity: 0.6; }
+  50% { transform: scale(1.25); opacity: 1; }
 }
 @keyframes splashExitSpin {
   0% { transform: rotate(0deg) scale(1); opacity: 1; }
@@ -350,12 +350,28 @@ body {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   background: var(--bg-1);
 }
-.splash-logo {
-  width: 140px; height: 140px;
-  animation: splashSpin 3s linear infinite, splashPulse 2s ease-in-out infinite;
+.splash-logo-wrap {
+  position: relative;
+  display: flex; align-items: center; justify-content: center;
 }
-.splash-logo.exit {
+.splash-glow {
+  position: absolute;
+  width: 200px; height: 200px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(50,210,245,0.3) 0%, rgba(91,138,245,0.18) 40%, transparent 70%);
+  animation: splashGlow 2s ease-in-out infinite;
+}
+.splash-logo {
+  width: 150px; height: 150px;
+  position: relative;
+  mix-blend-mode: screen;
+  animation: splashSpin 3s linear infinite;
+}
+.splash-logo-wrap.exit {
   animation: splashExitSpin 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+.splash-logo-wrap.exit .splash-glow {
+  animation: none; opacity: 0; transition: opacity 0.2s;
 }
 .splash-screen.exit {
   animation: splashFadeOut 0.3s ease 0.4s forwards;
@@ -377,7 +393,10 @@ body {
 <!-- Background -->
 <!-- Splash Screen -->
 <div class="splash-screen" id="splash">
-  <img src="icon-512.png" class="splash-logo" id="splash-logo" alt="BBYO">
+  <div class="splash-logo-wrap" id="splash-logo-wrap">
+    <div class="splash-glow"></div>
+    <img src="icon-512.png" class="splash-logo" alt="BBYO">
+  </div>
   <div class="splash-text">Loading<span class="splash-dots"></span></div>
 </div>
 
@@ -1119,10 +1138,10 @@ function renderAll(){
 }
 function dismissSplash() {
   const splash = document.getElementById('splash');
-  const logo = document.getElementById('splash-logo');
+  const logoWrap = document.getElementById('splash-logo-wrap');
   if (!splash) return;
   // Fast spin + shrink the logo
-  logo.classList.add('exit');
+  logoWrap.classList.add('exit');
   splash.classList.add('exit');
   // After exit animation, remove splash and show content
   setTimeout(() => {
