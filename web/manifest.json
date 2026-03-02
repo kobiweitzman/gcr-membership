@@ -2,11 +2,11 @@
   "name": "GCR Membership",
   "short_name": "GCR",
   "description": "Gold Coast Region BBYO Membership",
-  "start_url": "./",
-  "scope": "./",
+  "start_url": "/gcr-membership/",
+  "scope": "/gcr-membership/",
   "display": "standalone",
-  "background_color": "#1a2a4a",
-  "theme_color": "#1a2a4a",
+  "background_color": "#0d1627",
+  "theme_color": "#0d1627",
   "orientation": "portrait",
   "icons": [
     {
