@@ -1034,28 +1034,21 @@ function switchTab(name, direction) {
   document.getElementById('detail-panel').classList.remove('open');
   document.getElementById('chapter-detail-panel').classList.remove('open');
 
-  // Lock wrapper height so layout doesn't jump
-  wrapper.style.height = wrapper.offsetHeight + 'px';
-
-  // Place new page on top with opaque background, positioned off-screen
-  const startX = direction === 'left' ? '100%' : '-100%';
-  newPage.style.cssText = 'position:absolute;top:0;left:0;right:0;visibility:visible;pointer-events:auto;z-index:2;transform:translateX(' + startX + ');background:var(--bg-1);min-height:100dvh;';
+  // Hide old page immediately, show new page with slide-in
+  oldPage.classList.remove('active');
+  const startX = direction === 'left' ? '60px' : '-60px';
+  newPage.style.cssText = 'position:relative;visibility:visible;pointer-events:auto;transform:translateX(' + startX + ');opacity:0;';
   newPage.classList.add('active');
-  newPage.offsetHeight; // pre-render
-
-  // Animate new page sliding over old page
-  newPage.style.transition = 'transform 0.3s cubic-bezier(0.25, 1, 0.5, 1)';
+  newPage.offsetHeight; // force layout before animating
+  newPage.style.transition = 'transform 0.28s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.18s ease';
   newPage.style.transform = 'translateX(0)';
+  newPage.style.opacity = '1';
   window.scrollTo(0, 0);
 
   setTimeout(() => {
-    // Clean up — new page becomes the normal active page
-    oldPage.classList.remove('active');
-    oldPage.style.cssText = '';
     newPage.style.cssText = '';
-    wrapper.style.height = '';
     isAnimating = false;
-  }, 310);
+  }, 300);
 }
 
 function currentTab() { return document.querySelector('.tab-btn.active').dataset.tab; }
