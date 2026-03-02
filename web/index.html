@@ -523,7 +523,8 @@ function renderJoinLineGraph(timeline) {
   const container = document.getElementById('join-chart-container');
   if (!container) return;
   if (!timeline.length) { container.innerHTML = '<div style="color:var(--text-dim);font-size:13px;padding:12px 0;">No join data available.</div>'; return; }
-  const W = container.clientWidth || 340;
+  const W = container.clientWidth;
+  if (W < 50) return; // container hidden, skip — ResizeObserver will re-render when visible
   const H = 200;
   const padL = 32, padR = 12, padT = 12, padB = 28;
   const gW = W - padL - padR, gH = H - padT - padB;
