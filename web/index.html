@@ -1034,23 +1034,21 @@ function switchTab(name, direction) {
   document.getElementById('detail-panel').classList.remove('open');
   document.getElementById('chapter-detail-panel').classList.remove('open');
 
-  // Hide old page with display:none so nothing lingers
+  // Swap pages: hide old instantly, fade new in
   oldPage.classList.remove('active');
   oldPage.style.display = 'none';
-  const startX = direction === 'left' ? '60px' : '-60px';
-  newPage.style.cssText = 'position:relative;visibility:visible;pointer-events:auto;transform:translateX(' + startX + ');opacity:0;';
-  newPage.classList.add('active');
-  newPage.offsetHeight; // force layout before animating
-  newPage.style.transition = 'transform 0.28s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.18s ease';
-  newPage.style.transform = 'translateX(0)';
-  newPage.style.opacity = '1';
   window.scrollTo(0, 0);
+  newPage.classList.add('active');
+  newPage.style.opacity = '0';
+  newPage.offsetHeight;
+  newPage.style.transition = 'opacity 0.15s ease';
+  newPage.style.opacity = '1';
 
   setTimeout(() => {
     newPage.style.cssText = '';
     oldPage.style.display = '';
     isAnimating = false;
-  }, 300);
+  }, 180);
 }
 
 function currentTab() { return document.querySelector('.tab-btn.active').dataset.tab; }
