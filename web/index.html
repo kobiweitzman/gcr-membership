@@ -7,6 +7,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0d1627">
 <link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>GCR Membership</title>
 <style>
@@ -316,7 +318,7 @@ body {
 /* ===== ANIMATIONS ===== */
 @keyframes slideUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
 .anim { animation: slideUp 0.5s cubic-bezier(0.16,1,0.3,1) both; }
-.d1{animation-delay:.04s} .d2{animation-delay:.08s} .d3{animation-delay:.12s} .d4{animation-delay:.16s} .d5{animation-delay:.20s}
+.d1{animation-delay:.04s} .d2{animation-delay:.08s} .d3{animation-delay:.12s} .d4{animation-delay:.16s} .d5{animation-delay:.20s} .d6{animation-delay:.24s}
 </style>
 </head>
 <body>
@@ -401,7 +403,7 @@ async function loadData() {
     const cached = localStorage.getItem('gcr_members');
     if (cached) { members = JSON.parse(cached); processData(); renderAll(); }
     const r = await fetch(DATA_URL, { cache: 'no-store' });
-    if (r.ok) { members = await r.json(); localStorage.setItem('gcr_members', JSON.stringify(members)); processData(); renderAll(); }
+    if (r.ok) { members = await r.json(); checkForNewMembers(members); localStorage.setItem('gcr_members', JSON.stringify(members)); processData(); renderAll(); }
   } catch(e) {
     const cached = localStorage.getItem('gcr_members');
     if (cached) { members = JSON.parse(cached); processData(); renderAll(); }
@@ -425,6 +427,128 @@ function gradYears() { return [...new Set(members.map(m=>m.gradYear).filter(Bool
 function yearGrad(y) {
   const m={'2025':'linear-gradient(90deg,#ef4444,#dc2626)','2026':'linear-gradient(90deg,#ef4444,#f59e0b)','2027':'linear-gradient(90deg,#f59e0b,#fbbf24)','2028':'linear-gradient(90deg,#5b8af5,#32d2f5)','2029':'linear-gradient(90deg,#22c55e,#34d399)','2030':'linear-gradient(90deg,#a855f7,#ec4899)'};
   return m[y]||'linear-gradient(90deg,#888,#666)';
+}
+
+// ===== JOIN TIMELINE (LINE GRAPH) =====
+let joinTimeRange = 12; // default 1Y
+function getJoinTimeline(chapterFilter, monthCount) {
+  const src = chapterFilter ? members.filter(m => m.chapterName === chapterFilter) : members;
+  const withDate = src.filter(m => m.joinDate);
+  if (!withDate.length) return [];
+  const counts = {};
+  withDate.forEach(m => {
+    const key = m.joinDate.substring(0, 7);
+    counts[key] = (counts[key] || 0) + 1;
+  });
+  const end = new Date(); end.setDate(1);
+  let start;
+  if (monthCount === 'all') {
+    const keys = Object.keys(counts).sort();
+    start = new Date(keys[0] + '-01');
+  } else {
+    start = new Date(end);
+    start.setMonth(start.getMonth() - (monthCount - 1));
+  }
+  const months = [];
+  const cur = new Date(start);
+  const mn = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  while (cur <= end) {
+    const key = cur.toISOString().substring(0, 7);
+    const yr = String(cur.getFullYear()).slice(2);
+    months.push({ key, label: `${mn[cur.getMonth()]} '${yr}`, shortLabel: mn[cur.getMonth()], count: counts[key] || 0 });
+    cur.setMonth(cur.getMonth() + 1);
+  }
+  return months;
+}
+function renderJoinLineGraph(timeline) {
+  const container = document.getElementById('join-chart-container');
+  if (!container) return;
+  if (!timeline.length) { container.innerHTML = '<div style="color:var(--text-dim);font-size:13px;padding:12px 0;">No join data available.</div>'; return; }
+  const W = container.clientWidth || 340;
+  const H = 200;
+  const padL = 32, padR = 12, padT = 12, padB = 28;
+  const gW = W - padL - padR, gH = H - padT - padB;
+  const max = Math.max(...timeline.map(t => t.count), 1);
+  // Nice Y ticks
+  const tickCount = 4;
+  const rawStep = max / tickCount;
+  const step = rawStep <= 1 ? 1 : rawStep <= 5 ? Math.ceil(rawStep) : Math.ceil(rawStep / 5) * 5;
+  const yMax = step * tickCount;
+  const yTicks = [];
+  for (let i = 0; i <= tickCount; i++) yTicks.push(step * i);
+  // Points
+  const pts = timeline.map((t, i) => {
+    const x = padL + (timeline.length > 1 ? (i / (timeline.length - 1)) * gW : gW / 2);
+    const y = padT + gH - (t.count / yMax) * gH;
+    return { x, y, ...t };
+  });
+  const polyline = pts.map(p => `${p.x},${p.y}`).join(' ');
+  const areaPath = `M${pts[0].x},${padT + gH} ${pts.map(p => `L${p.x},${p.y}`).join(' ')} L${pts[pts.length-1].x},${padT + gH} Z`;
+  // X labels: show every Nth to avoid crowding
+  const maxLabels = Math.floor(gW / 42);
+  const labelStep = Math.max(1, Math.ceil(timeline.length / maxLabels));
+
+  let svg = `<svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" style="display:block;">`;
+  svg += `<defs>
+    <linearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#22c55e"/><stop offset="100%" stop-color="#34d399"/></linearGradient>
+    <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="rgba(34,197,94,0.25)"/><stop offset="100%" stop-color="rgba(34,197,94,0)"/></linearGradient>
+  </defs>`;
+  // Grid lines + Y labels
+  yTicks.forEach(v => {
+    const y = padT + gH - (v / yMax) * gH;
+    svg += `<line x1="${padL}" y1="${y}" x2="${W - padR}" y2="${y}" stroke="rgba(255,255,255,0.06)" stroke-dasharray="4,4"/>`;
+    svg += `<text x="${padL - 6}" y="${y + 4}" fill="rgba(255,255,255,0.35)" font-size="10" text-anchor="end" font-family="inherit">${v}</text>`;
+  });
+  // Area + Line
+  svg += `<path d="${areaPath}" fill="url(#areaGrad)"/>`;
+  svg += `<polyline points="${polyline}" fill="none" stroke="url(#lineGrad)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`;
+  // Dots + invisible hit targets
+  pts.forEach(p => {
+    svg += `<circle cx="${p.x}" cy="${p.y}" r="3.5" fill="#22c55e" stroke="rgba(13,22,39,0.6)" stroke-width="1.5"/>`;
+    svg += `<circle cx="${p.x}" cy="${p.y}" r="14" fill="transparent" onclick="showJoinTooltip(event,${Math.round(p.x)},${Math.round(p.y)},'${p.label}',${p.count})"/>`;
+  });
+  // X labels
+  pts.forEach((p, i) => {
+    if (i % labelStep === 0 || i === pts.length - 1) {
+      svg += `<text x="${p.x}" y="${H - 14}" fill="rgba(255,255,255,0.4)" font-size="10" text-anchor="middle" font-family="inherit">${timeline[i].shortLabel}</text>`;
+    }
+  });
+  svg += '</svg>';
+  container.innerHTML = svg;
+}
+function showJoinTooltip(e, x, y, label, count) {
+  e.stopPropagation();
+  let tip = document.getElementById('join-tooltip');
+  if (!tip) {
+    tip = document.createElement('div');
+    tip.id = 'join-tooltip';
+    tip.style.cssText = 'position:absolute;z-index:50;padding:6px 10px;border-radius:10px;background:rgba(30,40,60,0.92);border:1px solid rgba(255,255,255,0.15);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);font-size:12px;font-weight:700;color:#fff;pointer-events:none;white-space:nowrap;transition:opacity 0.15s;';
+    document.getElementById('join-chart-container').style.position = 'relative';
+    document.getElementById('join-chart-container').appendChild(tip);
+  }
+  tip.innerHTML = `${label}: <span style="color:var(--green)">${count}</span> joined`;
+  tip.style.opacity = '1';
+  const cw = document.getElementById('join-chart-container').clientWidth;
+  let left = x - 40;
+  if (left + 100 > cw) left = cw - 110;
+  if (left < 0) left = 4;
+  tip.style.left = left + 'px';
+  tip.style.top = (y - 36) + 'px';
+  clearTimeout(tip._hide);
+  tip._hide = setTimeout(() => { tip.style.opacity = '0'; }, 2000);
+}
+function setJoinRange(months) {
+  joinTimeRange = months;
+  document.querySelectorAll('.join-range-chip').forEach(el => {
+    el.classList.toggle('active', el.dataset.range == months);
+  });
+  updateJoinChart();
+}
+function updateJoinChart() {
+  const sel = document.getElementById('join-chapter-filter');
+  const chFilter = sel ? sel.value : '';
+  const timeline = getJoinTimeline(chFilter || null, joinTimeRange);
+  renderJoinLineGraph(timeline);
 }
 
 // ===== DASHBOARD =====
@@ -500,8 +624,31 @@ function renderDashboard() {
       </div>
     </div>
 
-    <div class="glass glass-section anim d3" style="padding:16px;margin-bottom:14px;" onclick="toggleInside('yr-exp','yr-chev')">
-      <div class="section-title">Members by Grad Year <span class="chevron" id="yr-chev">▾</span></div>
+    <div class="glass glass-section anim d3" style="padding:16px;margin-bottom:14px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <div class="section-title" style="margin:0;">Members Joined</div>
+        <select id="join-chapter-filter" onchange="updateJoinChart()" style="
+          padding:6px 12px;border-radius:12px;font-size:12px;font-weight:700;
+          background:rgba(255,255,255,0.08);color:var(--text-mid);border:1px solid rgba(255,255,255,0.12);
+          outline:none;max-width:180px;cursor:pointer;-webkit-appearance:none;appearance:none;
+          background-image:url('data:image/svg+xml;charset=UTF-8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%2212%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%23999%22 stroke-width=%222%22%3E%3Cpath d=%22M6 9l6 6 6-6%22/%3E%3C/svg%3E');
+          background-repeat:no-repeat;background-position:right 8px center;padding-right:28px;
+        ">
+          <option value="">All Chapters</option>
+          ${[...chapters].sort((a,b)=>a.name.localeCompare(b.name)).map(ch=>`<option value="${ch.name}">${ch.name.replace(/ #\\d+$/,'')}</option>`).join('')}
+        </select>
+      </div>
+      <div style="display:flex;gap:6px;margin-bottom:12px;">
+        <div class="filter-chip join-range-chip" data-range="3" onclick="setJoinRange(3)">3M</div>
+        <div class="filter-chip join-range-chip" data-range="6" onclick="setJoinRange(6)">6M</div>
+        <div class="filter-chip join-range-chip active" data-range="12" onclick="setJoinRange(12)">1Y</div>
+        <div class="filter-chip join-range-chip" data-range="all" onclick="setJoinRange('all')">All</div>
+      </div>
+      <div id="join-chart-container"></div>
+    </div>
+
+    <div class="glass glass-section anim d4" style="padding:16px;margin-bottom:14px;" onclick="toggleInside('yr-exp','yr-chev')">
+      <div class="section-title">Grad Year <span class="chevron" id="yr-chev">▾</span></div>
       ${years.map(([y,c])=>`
         <div class="bar-row">
           <div class="bar-label">${y}</div>
@@ -519,7 +666,7 @@ function renderDashboard() {
       </div>
     </div>
 
-    <div class="glass glass-section anim d4" style="padding:16px;margin-bottom:14px;" onclick="toggleInside('ch-exp','ch-chev')">
+    <div class="glass glass-section anim d5" style="padding:16px;margin-bottom:14px;" onclick="toggleInside('ch-exp','ch-chev')">
       <div class="section-title">Largest Chapters <span class="chevron" id="ch-chev">▾</span></div>
       ${topCh.slice(0,5).map((ch,i)=>chapterRankRow(ch,i,maxCh)).join('')}
       <div id="ch-exp" class="expand-inside">
@@ -527,7 +674,7 @@ function renderDashboard() {
       </div>
     </div>
 
-    <div class="glass glass-section anim d5" style="padding:16px;margin-bottom:14px;" onclick="toggleInside('split-exp','split-chev')">
+    <div class="glass glass-section anim d6" style="padding:16px;margin-bottom:14px;" onclick="toggleInside('split-exp','split-chev')">
       <div class="section-title">AZA / BBG Split <span class="chevron" id="split-chev">▾</span></div>
       <div class="split-bar">
         <div class="split-segment" style="flex:${aza};background:linear-gradient(90deg,var(--cyan),var(--blue));">${aza>0?'AZA':''}</div>
@@ -871,10 +1018,68 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
   });
 });
 
-function renderAll(){renderDashboard();try{renderGoals();}catch(e){}renderChapters();renderMembers();}
+function renderAll(){renderDashboard();updateJoinChart();try{renderGoals();}catch(e){}renderChapters();renderMembers();}
+
+// ===== NEW MEMBER NOTIFICATIONS =====
+function requestNotificationPermission() {
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
+}
+function checkForNewMembers(freshMembers) {
+  const prevNames = JSON.parse(localStorage.getItem('gcr_known_members') || '[]');
+  if (!prevNames.length) {
+    // First load — just save the current list, don't notify
+    localStorage.setItem('gcr_known_members', JSON.stringify(freshMembers.map(m => m.fullName)));
+    return;
+  }
+  const prevSet = new Set(prevNames);
+  const newMembers = freshMembers.filter(m => !prevSet.has(m.fullName));
+  if (newMembers.length > 0) {
+    // Save updated list
+    localStorage.setItem('gcr_known_members', JSON.stringify(freshMembers.map(m => m.fullName)));
+    // Send notifications
+    if ('Notification' in window && Notification.permission === 'granted') {
+      newMembers.forEach(m => {
+        const ch = m.chapterName || 'BBYO';
+        new Notification('New Member! 🎉', {
+          body: `${m.fullName} joined ${ch}!`,
+          icon: 'icon-192.png',
+          tag: 'new-member-' + m.fullName
+        });
+      });
+    }
+    // Also show an in-app toast
+    showNewMemberToast(newMembers);
+  } else {
+    // Update list in case names changed
+    localStorage.setItem('gcr_known_members', JSON.stringify(freshMembers.map(m => m.fullName)));
+  }
+}
+function showNewMemberToast(newMembers) {
+  const existing = document.getElementById('new-member-toast');
+  if (existing) existing.remove();
+  const msgs = newMembers.slice(0, 5).map(m => {
+    const ch = (m.chapterName || 'BBYO').replace(/ #\d+$/, '');
+    return `<div style="padding:4px 0;"><b>${m.fullName}</b> → ${ch}</div>`;
+  });
+  if (newMembers.length > 5) msgs.push(`<div style="padding:4px 0;color:var(--text-dim);">+${newMembers.length - 5} more</div>`);
+  const toast = document.createElement('div');
+  toast.id = 'new-member-toast';
+  toast.style.cssText = 'position:fixed;top:calc(16px + var(--safe-top));left:16px;right:16px;z-index:300;padding:16px;border-radius:16px;background:rgba(34,197,94,0.15);border:1px solid rgba(34,197,94,0.3);backdrop-filter:blur(30px);-webkit-backdrop-filter:blur(30px);animation:slideUp 0.4s ease;';
+  toast.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+    <div style="font-size:14px;font-weight:800;color:var(--green);">🎉 New Member${newMembers.length > 1 ? 's' : ''}!</div>
+    <button onclick="this.parentElement.parentElement.remove()" style="background:none;border:none;color:var(--text-dim);font-size:18px;cursor:pointer;">&times;</button>
+  </div><div style="font-size:13px;">${msgs.join('')}</div>`;
+  document.body.appendChild(toast);
+  setTimeout(() => { if (toast.parentElement) toast.remove(); }, 10000);
+}
+
 if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
 const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent);
 if(isIOS&&!window.navigator.standalone) setTimeout(()=>document.getElementById('install-banner').classList.add('show'),2500);
+// Request notification permission shortly after load
+setTimeout(requestNotificationPermission, 3000);
 loadData();
 </script>
 </body>
