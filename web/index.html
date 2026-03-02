@@ -364,7 +364,6 @@ body {
 .splash-logo {
   width: 150px; height: 150px;
   position: relative;
-  mix-blend-mode: screen;
   animation: splashSpin 3s linear infinite;
 }
 .splash-logo-wrap.exit {
@@ -395,10 +394,33 @@ body {
 <div class="splash-screen" id="splash">
   <div class="splash-logo-wrap" id="splash-logo-wrap">
     <div class="splash-glow"></div>
-    <img src="icon-512.png" class="splash-logo" alt="BBYO">
+    <canvas class="splash-logo" id="splash-canvas" width="512" height="512"></canvas>
   </div>
   <div class="splash-text">Loading<span class="splash-dots"></span></div>
 </div>
+<script>
+(function(){
+  var img = new Image();
+  img.onload = function(){
+    var c = document.getElementById('splash-canvas');
+    if(!c) return;
+    var ctx = c.getContext('2d');
+    ctx.drawImage(img, 0, 0, 512, 512);
+    var d = ctx.getImageData(0, 0, 512, 512);
+    var p = d.data;
+    for(var i = 0; i < p.length; i += 4){
+      var brightness = p[i] * 0.299 + p[i+1] * 0.587 + p[i+2] * 0.114;
+      if(brightness < 45){
+        p[i+3] = 0;
+      } else if(brightness < 65){
+        p[i+3] = Math.round((brightness - 45) / 20 * 255);
+      }
+    }
+    ctx.putImageData(d, 0, 0);
+  };
+  img.src = 'icon-512.png';
+})();
+</script>
 
 <div class="bg-canvas"></div>
 <div class="orb orb-1"></div>
