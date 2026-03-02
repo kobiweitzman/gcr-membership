@@ -1007,16 +1007,37 @@ function showMemberDetail(name) {
 }
 
 // ===== TABS =====
+const tabOrder = ['dashboard','goals','chapters','members'];
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelector(`.tab-btn[data-tab="${name}"]`).classList.add('active');
+  document.getElementById(name+'-page').classList.add('active');
+  document.getElementById('detail-panel').classList.remove('open');
+  document.getElementById('chapter-detail-panel').classList.remove('open');
+}
+function currentTab() { return document.querySelector('.tab-btn.active').dataset.tab; }
 document.querySelectorAll('.tab-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
-    document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-    btn.classList.add('active');
-    document.getElementById(btn.dataset.tab+'-page').classList.add('active');
-    document.getElementById('detail-panel').classList.remove('open');
-    document.getElementById('chapter-detail-panel').classList.remove('open');
-  });
+  btn.addEventListener('click', () => switchTab(btn.dataset.tab));
 });
+
+// ===== SWIPE NAVIGATION =====
+let touchStartX = 0, touchStartY = 0, touchStartTime = 0;
+document.addEventListener('touchstart', e => {
+  touchStartX = e.changedTouches[0].clientX;
+  touchStartY = e.changedTouches[0].clientY;
+  touchStartTime = Date.now();
+}, { passive: true });
+document.addEventListener('touchend', e => {
+  const dx = e.changedTouches[0].clientX - touchStartX;
+  const dy = e.changedTouches[0].clientY - touchStartY;
+  const dt = Date.now() - touchStartTime;
+  // Must be a horizontal swipe: >60px, more horizontal than vertical, under 400ms
+  if (Math.abs(dx) < 60 || Math.abs(dy) > Math.abs(dx) * 0.7 || dt > 400) return;
+  const idx = tabOrder.indexOf(currentTab());
+  if (dx < 0 && idx < tabOrder.length - 1) switchTab(tabOrder[idx + 1]); // swipe left → next
+  if (dx > 0 && idx > 0) switchTab(tabOrder[idx - 1]); // swipe right → prev
+}, { passive: true });
 
 function renderAll(){renderDashboard();updateJoinChart();try{renderGoals();}catch(e){}renderChapters();renderMembers();}
 
