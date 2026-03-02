@@ -1037,13 +1037,13 @@ function switchTab(name, direction) {
   // Lock wrapper height so layout doesn't jump
   wrapper.style.height = wrapper.offsetHeight + 'px';
 
-  // Place new page on top, positioned off-screen
+  // Place new page on top with opaque background, positioned off-screen
   const startX = direction === 'left' ? '100%' : '-100%';
-  newPage.style.cssText = 'position:absolute;top:0;left:0;right:0;visibility:visible;pointer-events:auto;z-index:2;transform:translateX(' + startX + ');';
+  newPage.style.cssText = 'position:absolute;top:0;left:0;right:0;visibility:visible;pointer-events:auto;z-index:2;transform:translateX(' + startX + ');background:var(--bg-1);min-height:100dvh;';
   newPage.classList.add('active');
   newPage.offsetHeight; // pre-render
 
-  // Animate new page sliding in
+  // Animate new page sliding over old page
   newPage.style.transition = 'transform 0.3s cubic-bezier(0.25, 1, 0.5, 1)';
   newPage.style.transform = 'translateX(0)';
   window.scrollTo(0, 0);
