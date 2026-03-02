@@ -1128,6 +1128,8 @@ function dismissSplash() {
     splash.remove();
     document.getElementById('main-content').style.display = '';
     document.getElementById('tab-bar').style.display = '';
+    // Re-render chart now that container is visible and has real width
+    updateJoinChart();
     // Disable staggered animations so tab switches are instant
     setTimeout(() => {
       document.querySelectorAll('.anim').forEach(el => el.classList.add('anim-done'));
