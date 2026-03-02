@@ -147,8 +147,27 @@ body {
 .tab-btn svg { width: 22px; height: 22px; fill: currentColor; }
 
 /* ===== PAGES ===== */
-.page { display: none; position: relative; z-index: 1; padding: 16px 16px calc(76px + var(--safe-bottom)); min-height: 100dvh; }
+.page-wrapper { position: relative; overflow-x: hidden; min-height: 100dvh; z-index: 1; }
+.page {
+  display: none;
+  padding: 16px 16px calc(76px + var(--safe-bottom));
+  min-height: 100dvh;
+  position: relative; z-index: 1;
+}
 .page.active { display: block; }
+.page.animating {
+  display: block; position: absolute; top: 0; left: 0; right: 0; z-index: 0;
+  transition: transform 0.32s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.32s ease;
+  will-change: transform, opacity;
+}
+.page.animating.out-left  { transform: translateX(-30%); opacity: 0; }
+.page.animating.out-right { transform: translateX(30%); opacity: 0; }
+.page.animating.in-enter  {
+  z-index: 1; position: relative;
+  animation: slideIn 0.32s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+@keyframes slideInFromRight { from { transform: translateX(60px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+@keyframes slideInFromLeft  { from { transform: translateX(-60px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 
 /* ===== HEADER ===== */
 .header-card { text-align: center; padding: 22px 20px; margin-bottom: 14px; }
@@ -331,10 +350,12 @@ body {
 <div class="orb orb-4"></div>
 
 <!-- Pages -->
-<div id="dashboard-page" class="page active"></div>
-<div id="goals-page" class="page"></div>
-<div id="chapters-page" class="page"></div>
-<div id="members-page" class="page"></div>
+<div class="page-wrapper">
+  <div id="dashboard-page" class="page active"></div>
+  <div id="goals-page" class="page"></div>
+  <div id="chapters-page" class="page"></div>
+  <div id="members-page" class="page"></div>
+</div>
 <div id="detail-panel" class="detail-panel"></div>
 <div id="chapter-detail-panel" class="detail-panel"></div>
 
@@ -1008,15 +1029,46 @@ function showMemberDetail(name) {
 
 // ===== TABS =====
 const tabOrder = ['dashboard','goals','chapters','members'];
-function switchTab(name) {
-  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+let isAnimating = false;
+
+function switchTab(name, direction) {
+  const cur = currentTab();
+  if (cur === name || isAnimating) return;
+  if (!direction) direction = tabOrder.indexOf(name) > tabOrder.indexOf(cur) ? 'left' : 'right';
+
+  isAnimating = true;
+  const oldPage = document.getElementById(cur + '-page');
+  const newPage = document.getElementById(name + '-page');
+  const anim = direction === 'left' ? 'slideInFromRight' : 'slideInFromLeft';
+
+  // Update tab bar
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelector(`.tab-btn[data-tab="${name}"]`).classList.add('active');
-  document.getElementById(name+'-page').classList.add('active');
   document.getElementById('detail-panel').classList.remove('open');
   document.getElementById('chapter-detail-panel').classList.remove('open');
+
+  // Animate old page out (absolute so it doesn't affect layout)
+  oldPage.classList.remove('active');
+  oldPage.classList.add('animating');
+  oldPage.style.transform = 'translateX(0)'; oldPage.style.opacity = '1';
+  oldPage.offsetHeight;
+  oldPage.classList.add(direction === 'left' ? 'out-left' : 'out-right');
+
+  // Show new page with slide-in animation
+  newPage.classList.add('active');
+  newPage.style.animation = `${anim} 0.32s cubic-bezier(0.4,0,0.2,1) both`;
+  window.scrollTo(0, 0);
+
+  setTimeout(() => {
+    oldPage.classList.remove('animating', 'out-left', 'out-right');
+    oldPage.style.transform = ''; oldPage.style.opacity = '';
+    newPage.style.animation = '';
+    isAnimating = false;
+  }, 340);
 }
+
 function currentTab() { return document.querySelector('.tab-btn.active').dataset.tab; }
+
 document.querySelectorAll('.tab-btn').forEach(btn => {
   btn.addEventListener('click', () => switchTab(btn.dataset.tab));
 });
@@ -1032,11 +1084,10 @@ document.addEventListener('touchend', e => {
   const dx = e.changedTouches[0].clientX - touchStartX;
   const dy = e.changedTouches[0].clientY - touchStartY;
   const dt = Date.now() - touchStartTime;
-  // Must be a horizontal swipe: >60px, more horizontal than vertical, under 400ms
   if (Math.abs(dx) < 60 || Math.abs(dy) > Math.abs(dx) * 0.7 || dt > 400) return;
   const idx = tabOrder.indexOf(currentTab());
-  if (dx < 0 && idx < tabOrder.length - 1) switchTab(tabOrder[idx + 1]); // swipe left → next
-  if (dx > 0 && idx > 0) switchTab(tabOrder[idx - 1]); // swipe right → prev
+  if (dx < 0 && idx < tabOrder.length - 1) switchTab(tabOrder[idx + 1], 'left');
+  if (dx > 0 && idx > 0) switchTab(tabOrder[idx - 1], 'right');
 }, { passive: true });
 
 function renderAll(){renderDashboard();updateJoinChart();try{renderGoals();}catch(e){}renderChapters();renderMembers();}
