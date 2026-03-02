@@ -1034,8 +1034,9 @@ function switchTab(name, direction) {
   document.getElementById('detail-panel').classList.remove('open');
   document.getElementById('chapter-detail-panel').classList.remove('open');
 
-  // Hide old page immediately, show new page with slide-in
+  // Hide old page with display:none so nothing lingers
   oldPage.classList.remove('active');
+  oldPage.style.display = 'none';
   const startX = direction === 'left' ? '60px' : '-60px';
   newPage.style.cssText = 'position:relative;visibility:visible;pointer-events:auto;transform:translateX(' + startX + ');opacity:0;';
   newPage.classList.add('active');
@@ -1047,6 +1048,7 @@ function switchTab(name, direction) {
 
   setTimeout(() => {
     newPage.style.cssText = '';
+    oldPage.style.display = '';
     isAnimating = false;
   }, 300);
 }
