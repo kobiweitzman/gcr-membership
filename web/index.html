@@ -605,8 +605,8 @@ function renderJoinLineGraph(timeline) {
   svg += `<polyline points="${polyline}" fill="none" stroke="url(#lineGrad)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`;
   // Dots + tap targets
   pts.forEach(p => {
-    svg += `<circle cx="${p.x}" cy="${p.y}" r="5" fill="#22c55e" stroke="rgba(13,22,39,0.6)" stroke-width="1.5"/>`;
-    svg += `<circle cx="${p.x}" cy="${p.y}" r="22" fill="transparent" style="cursor:pointer" onclick="showJoinTooltip(event,${Math.round(p.x)},${Math.round(p.y)},'${p.label}',${p.count})"/>`;
+    svg += `<circle cx="${p.x}" cy="${p.y}" r="5" fill="#22c55e" stroke="rgba(13,22,39,0.6)" stroke-width="1.5" pointer-events="none"/>`;
+    svg += `<circle cx="${p.x}" cy="${p.y}" r="22" fill="rgba(0,0,0,0.001)" pointer-events="all" style="cursor:pointer" onclick="showJoinTooltip(event,${Math.round(p.x)},${Math.round(p.y)},'${p.label}',${p.count})"/>`;
   });
   // X labels
   pts.forEach((p, i) => {
@@ -623,18 +623,27 @@ function showJoinTooltip(e, x, y, label, count) {
   if (!tip) {
     tip = document.createElement('div');
     tip.id = 'join-tooltip';
-    tip.style.cssText = 'position:absolute;z-index:50;padding:8px 14px;border-radius:12px;background:rgba(30,40,60,0.95);border:1px solid rgba(255,255,255,0.18);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);font-size:14px;font-weight:700;color:#fff;pointer-events:none;white-space:nowrap;transition:opacity 0.15s;';
-    document.getElementById('join-chart-container').style.position = 'relative';
-    document.getElementById('join-chart-container').appendChild(tip);
+    tip.style.cssText = 'position:fixed;z-index:999;padding:10px 16px;border-radius:14px;background:rgba(20,30,50,0.95);border:1px solid rgba(255,255,255,0.18);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);font-size:15px;font-weight:700;color:#fff;pointer-events:none;white-space:nowrap;transition:opacity 0.2s;text-align:center;';
+    document.body.appendChild(tip);
   }
   tip.innerHTML = `${label}: <span style="color:var(--green)">${count}</span> joined`;
   tip.style.opacity = '1';
-  const cw = document.getElementById('join-chart-container').clientWidth;
-  let left = x - 40;
-  if (left + 100 > cw) left = cw - 110;
-  if (left < 0) left = 4;
-  tip.style.left = left + 'px';
-  tip.style.top = (y - 36) + 'px';
+  // Position using viewport coordinates from the SVG element
+  const container = document.getElementById('join-chart-container');
+  const svg = container.querySelector('svg');
+  if (svg) {
+    const rect = svg.getBoundingClientRect();
+    const scaleX = rect.width / svg.viewBox.baseVal.width;
+    const scaleY = rect.height / svg.viewBox.baseVal.height;
+    const vx = rect.left + x * scaleX;
+    const vy = rect.top + y * scaleY;
+    const tipW = tip.offsetWidth || 120;
+    let left = vx - tipW / 2;
+    if (left + tipW > window.innerWidth - 8) left = window.innerWidth - tipW - 8;
+    if (left < 8) left = 8;
+    tip.style.left = left + 'px';
+    tip.style.top = (vy - 44) + 'px';
+  }
   clearTimeout(tip._hide);
   tip._hide = setTimeout(() => { tip.style.opacity = '0'; }, 3000);
 }
