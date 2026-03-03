@@ -603,10 +603,10 @@ function renderJoinLineGraph(timeline) {
   // Area + Line
   svg += `<path d="${areaPath}" fill="url(#areaGrad)"/>`;
   svg += `<polyline points="${polyline}" fill="none" stroke="url(#lineGrad)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`;
-  // Dots + tap targets
-  pts.forEach(p => {
+  // Dots + tap targets (use data attributes, attach listeners after)
+  pts.forEach((p, i) => {
     svg += `<circle cx="${p.x}" cy="${p.y}" r="5" fill="#22c55e" stroke="rgba(13,22,39,0.6)" stroke-width="1.5" pointer-events="none"/>`;
-    svg += `<circle cx="${p.x}" cy="${p.y}" r="22" fill="rgba(0,0,0,0.001)" pointer-events="all" style="cursor:pointer" onclick="showJoinTooltip(event,${Math.round(p.x)},${Math.round(p.y)},'${p.label}',${p.count})"/>`;
+    svg += `<circle cx="${p.x}" cy="${p.y}" r="22" fill="rgba(0,0,0,0.001)" pointer-events="all" style="cursor:pointer" class="chart-dot" data-idx="${i}"/>`;
   });
   // X labels
   pts.forEach((p, i) => {
@@ -616,9 +616,20 @@ function renderJoinLineGraph(timeline) {
   });
   svg += '</svg>';
   container.innerHTML = svg;
+  // Attach click + touch listeners to each dot
+  container.querySelectorAll('.chart-dot').forEach(dot => {
+    const i = +dot.dataset.idx;
+    const p = pts[i];
+    function handleTap(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      showJoinTooltip(Math.round(p.x), Math.round(p.y), p.label, p.count);
+    }
+    dot.addEventListener('click', handleTap);
+    dot.addEventListener('touchend', handleTap);
+  });
 }
-function showJoinTooltip(e, x, y, label, count) {
-  e.stopPropagation();
+function showJoinTooltip(x, y, label, count) {
   let tip = document.getElementById('join-tooltip');
   if (!tip) {
     tip = document.createElement('div');
