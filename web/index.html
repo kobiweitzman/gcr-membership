@@ -257,7 +257,7 @@ body {
   cursor: pointer; transition: all 0.2s;
 }
 .filter-chip.active {
-  background: linear-gradient(135deg, var(--cyan), var(--blue));
+  background: var(--active-bg, linear-gradient(135deg, var(--cyan), var(--blue)));
   color: #fff; border-color: transparent;
   box-shadow: 0 2px 10px rgba(50,210,245,0.30);
 }
@@ -531,8 +531,10 @@ function yearGrad(y) {
 
 // ===== JOIN TIMELINE (LINE GRAPH) =====
 let joinTimeRange = 12; // default 1Y
+let joinOrderFilter = ''; // '', 'AZA', or 'BBG'
 function getJoinTimeline(chapterFilter, monthCount) {
-  const src = chapterFilter ? members.filter(m => m.chapterName === chapterFilter) : members;
+  let src = chapterFilter ? members.filter(m => m.chapterName === chapterFilter) : members;
+  if (joinOrderFilter) src = src.filter(m => m.order === joinOrderFilter);
   const withDate = src.filter(m => m.joinDate);
   if (!withDate.length) return [];
   const counts = {};
@@ -616,17 +618,18 @@ function renderJoinLineGraph(timeline) {
   });
   svg += '</svg>';
   container.innerHTML = svg;
-  // Attach click + touch listeners to each dot
+  // Attach hover (desktop) + touch (mobile) listeners to each dot
+  const isTouch = 'ontouchstart' in window;
   container.querySelectorAll('.chart-dot').forEach(dot => {
     const i = +dot.dataset.idx;
     const p = pts[i];
-    function handleTap(e) {
-      e.preventDefault();
-      e.stopPropagation();
-      showJoinTooltip(Math.round(p.x), Math.round(p.y), p.label, p.count);
+    function show() { showJoinTooltip(Math.round(p.x), Math.round(p.y), p.label, p.count); }
+    if (isTouch) {
+      dot.addEventListener('touchend', e => { e.preventDefault(); show(); });
+    } else {
+      dot.addEventListener('mouseenter', show);
+      dot.addEventListener('mouseleave', hideJoinTooltip);
     }
-    dot.addEventListener('click', handleTap);
-    dot.addEventListener('touchend', handleTap);
   });
 }
 function showJoinTooltip(x, y, label, count) {
@@ -656,12 +659,23 @@ function showJoinTooltip(x, y, label, count) {
     tip.style.top = (vy - 44) + 'px';
   }
   clearTimeout(tip._hide);
-  tip._hide = setTimeout(() => { tip.style.opacity = '0'; }, 3000);
+  tip._hide = setTimeout(hideJoinTooltip, 3000);
+}
+function hideJoinTooltip() {
+  const tip = document.getElementById('join-tooltip');
+  if (tip) tip.style.opacity = '0';
 }
 function setJoinRange(months) {
   joinTimeRange = months;
   document.querySelectorAll('.join-range-chip').forEach(el => {
     el.classList.toggle('active', el.dataset.range == months);
+  });
+  updateJoinChart();
+}
+function setJoinOrder(order) {
+  joinOrderFilter = order;
+  document.querySelectorAll('.join-order-chip').forEach(el => {
+    el.classList.toggle('active', el.dataset.order === order);
   });
   updateJoinChart();
 }
@@ -759,11 +773,16 @@ function renderDashboard() {
           ${[...chapters].sort((a,b)=>a.name.localeCompare(b.name)).map(ch=>`<option value="${ch.name}">${ch.name.replace(/ #\\d+$/,'')}</option>`).join('')}
         </select>
       </div>
-      <div style="display:flex;gap:6px;margin-bottom:12px;">
+      <div style="display:flex;gap:6px;margin-bottom:8px;">
         <div class="filter-chip join-range-chip" data-range="3" onclick="setJoinRange(3)">3M</div>
         <div class="filter-chip join-range-chip" data-range="6" onclick="setJoinRange(6)">6M</div>
         <div class="filter-chip join-range-chip active" data-range="12" onclick="setJoinRange(12)">1Y</div>
         <div class="filter-chip join-range-chip" data-range="all" onclick="setJoinRange('all')">All</div>
+      </div>
+      <div style="display:flex;gap:6px;margin-bottom:12px;">
+        <div class="filter-chip join-order-chip active" data-order="" onclick="setJoinOrder('')">Both</div>
+        <div class="filter-chip join-order-chip" data-order="AZA" onclick="setJoinOrder('AZA')" style="--active-bg:linear-gradient(135deg, var(--blue), var(--indigo))">AZA</div>
+        <div class="filter-chip join-order-chip" data-order="BBG" onclick="setJoinOrder('BBG')" style="--active-bg:linear-gradient(135deg, var(--pink), var(--purple))">BBG</div>
       </div>
       <div id="join-chart-container"></div>
     </div>
