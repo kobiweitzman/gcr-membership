@@ -1224,17 +1224,19 @@ function requestNotificationPermission() {
 }
 function checkForNewMembers(freshMembers) {
   const prevNames = JSON.parse(localStorage.getItem('gcr_known_members') || '[]');
-  if (!prevNames.length) {
-    // First load — just save the current list, don't notify
-    localStorage.setItem('gcr_known_members', JSON.stringify(freshMembers.map(m => m.fullName)));
-    return;
-  }
+  // Always update the known list
+  localStorage.setItem('gcr_known_members', JSON.stringify(freshMembers.map(m => m.fullName)));
+  if (!prevNames.length) return; // First load — no notifications
   const prevSet = new Set(prevNames);
-  const newMembers = freshMembers.filter(m => !prevSet.has(m.fullName));
+  // Only notify for members not in the known list AND who joined in the last 7 days
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  const newMembers = freshMembers.filter(m => {
+    if (prevSet.has(m.fullName)) return false;
+    if (!m.joinDate) return false;
+    return new Date(m.joinDate) >= sevenDaysAgo;
+  });
   if (newMembers.length > 0) {
-    // Save updated list
-    localStorage.setItem('gcr_known_members', JSON.stringify(freshMembers.map(m => m.fullName)));
-    // Send notifications
     if ('Notification' in window && Notification.permission === 'granted') {
       newMembers.forEach(m => {
         const ch = m.chapterName || 'BBYO';
@@ -1245,11 +1247,7 @@ function checkForNewMembers(freshMembers) {
         });
       });
     }
-    // Also show an in-app toast
     showNewMemberToast(newMembers);
-  } else {
-    // Update list in case names changed
-    localStorage.setItem('gcr_known_members', JSON.stringify(freshMembers.map(m => m.fullName)));
   }
 }
 function showNewMemberToast(newMembers) {
