@@ -173,30 +173,27 @@ def scrape_membership_export():
             page.screenshot(path="/tmp/debug_export_dialog.png")
             page.wait_for_timeout(3000)
 
-        # --- DEBUG: always capture what the export dialog looks like ---
-        debug_dir = os.environ.get("DEBUG_ARTIFACT_DIR", "/tmp")
+        # --- Select "Details Only" so ALL rows are exported ---
+        # The dialog defaults to "Formatted Report", which only exports the
+        # ~30 rows currently rendered in the report preview. "Details Only"
+        # exports every row. Without this, we get 30 members instead of ~994.
+        print("Selecting 'Details Only' export option...")
         try:
-            page.screenshot(path=f"{debug_dir}/debug_export_dialog_full.png", full_page=True)
-            print(f"Saved full-page screenshot: {debug_dir}/debug_export_dialog_full.png")
+            details_card = page.locator(
+                "text=Details Only, "
+                "label:has-text('Details Only'), "
+                "[aria-label='Details Only']"
+            ).first
+            details_card.click(timeout=10000)
+            page.wait_for_timeout(500)
+            print("Selected 'Details Only'.")
         except Exception as e:
-            print(f"Screenshot failed: {e}")
-
-        try:
-            dialog_locator = page.locator("section[role='dialog'], div[role='dialog'], .slds-modal").first
-            dialog_html = dialog_locator.evaluate("el => el.outerHTML")
-            with open(f"{debug_dir}/debug_export_dialog.html", "w") as f:
-                f.write(dialog_html)
-            print(f"Saved dialog HTML: {debug_dir}/debug_export_dialog.html ({len(dialog_html)} bytes)")
-        except Exception as e:
-            print(f"Dialog HTML dump failed: {e}")
-            # Fall back to dumping the whole page body so we at least see structure
+            print(f"WARNING: Could not select 'Details Only' card: {e}")
+            debug_dir = os.environ.get("DEBUG_ARTIFACT_DIR", "/tmp")
             try:
-                body_html = page.locator("body").evaluate("el => el.outerHTML")
-                with open(f"{debug_dir}/debug_page_body.html", "w") as f:
-                    f.write(body_html)
-                print(f"Saved full page body: {debug_dir}/debug_page_body.html ({len(body_html)} bytes)")
-            except Exception as e2:
-                print(f"Body HTML dump also failed: {e2}")
+                page.screenshot(path=f"{debug_dir}/debug_no_details_card.png", full_page=True)
+            except Exception:
+                pass
 
         # --- Click the Export button inside the dialog (the brand/primary button) ---
         print("Clicking Export in dialog...")
