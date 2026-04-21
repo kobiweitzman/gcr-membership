@@ -349,6 +349,27 @@ def scrape_membership_export():
         except Exception:
             pass
 
+        # --- Enable "Export all data" toggle ---
+        # Without this, the export is capped to the 30-row preview even when
+        # "Details Only" is selected.
+        print("Enabling 'Export all data' toggle...")
+        try:
+            toggle_label = page.get_by_text("Export all data", exact=True).first
+            if toggle_label.count() > 0:
+                toggle_label.click(timeout=5000)
+                print("  Clicked 'Export all data' label.")
+            else:
+                print("  WARNING: 'Export all data' label not found.")
+        except Exception as e:
+            print(f"  WARNING: Export-all-data click failed: {e}")
+
+        page.wait_for_timeout(500)
+
+        try:
+            page.screenshot(path=f"{debug_dir}/debug_after_export_all_click.png", full_page=True)
+        except Exception:
+            pass
+
         # --- Click the Export button inside the dialog (the brand/primary button) ---
         print("Clicking Export in dialog...")
 
