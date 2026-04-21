@@ -184,63 +184,95 @@ def scrape_membership_export():
         except Exception:
             pass
 
-        # Dump ALL shadow DOM starting from the "Details Only" text element
-        # upwards, so we can see the entire dialog structure including nested
-        # shadow roots (where the report row-limit control likely lives).
+        # Starting from the "Details Only" text (which Playwright finds by
+        # piercing shadow DOM), walk UP via getRootNode().host to escape nested
+        # shadow roots, then serialize from the outermost ancestor downwards
+        # including all shadow subtrees.
         try:
-            full_dialog_html = page.evaluate("""() => {
-                // Walk shadow DOM recursively to find a dialog that contains
-                // "Details Only" text, then serialize it with shadow roots inlined.
-                function findDialog(root) {
-                    if (!root) return null;
-                    const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
-                    let n;
-                    while ((n = walker.nextNode())) {
-                        if ((n.getAttribute && n.getAttribute('role') === 'dialog') ||
-                            n.classList?.contains('slds-modal') ||
-                            n.tagName === 'SECTION' && n.textContent?.includes('Details Only')) {
-                            if (n.textContent?.includes('Details Only')) return n;
-                        }
-                        if (n.shadowRoot) {
-                            const hit = findDialog(n.shadowRoot);
-                            if (hit) return hit;
-                        }
+            full_dialog_html = page.get_by_text("Details Only", exact=True).first.evaluate("""el => {
+                // Walk up through shadow boundaries to find the outermost shadow host.
+                let node = el;
+                let hosts = [];
+                while (node) {
+                    const root = node.getRootNode();
+                    if (root instanceof ShadowRoot) {
+                        hosts.push(root.host);
+                        node = root.host;
+                    } else {
+                        break;
                     }
-                    return null;
+                }
+                // Take the highest ancestor (outermost shadow host) and go up
+                // a few more levels in the light DOM to capture the whole modal.
+                let anchor = hosts.length ? hosts[hosts.length - 1] : el;
+                for (let i = 0; i < 6 && anchor.parentElement; i++) {
+                    anchor = anchor.parentElement;
                 }
                 function serialize(el, depth) {
-                    if (depth > 20) return '<TRUNCATED>';
-                    if (!el) return '';
+                    if (depth > 15) return '<T>';
+                    if (!el || !el.tagName) return '';
                     let html = '<' + el.tagName.toLowerCase();
                     for (const attr of el.attributes || []) {
-                        html += ' ' + attr.name + '=\"' + (attr.value || '').replace(/\"/g,'&quot;').slice(0,200) + '\"';
+                        html += ' ' + attr.name + '="' + (attr.value||'').replace(/"/g,'&quot;').slice(0,120) + '"';
                     }
                     html += '>';
                     if (el.shadowRoot) {
-                        html += '<!-- SHADOW -->';
-                        for (const child of el.shadowRoot.children) {
-                            html += serialize(child, depth+1);
-                        }
-                        html += '<!-- /SHADOW -->';
+                        html += '<!--SHADOW-->';
+                        for (const c of el.shadowRoot.children) html += serialize(c, depth+1);
+                        html += '<!--/SHADOW-->';
                     }
-                    for (const child of el.children || []) {
-                        html += serialize(child, depth+1);
+                    for (const c of el.childNodes || []) {
+                        if (c.nodeType === 1) html += serialize(c, depth+1);
+                        else if (c.nodeType === 3 && c.textContent.trim()) html += c.textContent.trim().slice(0,100);
                     }
-                    const txt = el.childNodes && Array.from(el.childNodes)
-                        .filter(n => n.nodeType === 3)
-                        .map(n => n.textContent).join('').trim();
-                    if (txt) html += txt.slice(0, 200);
                     html += '</' + el.tagName.toLowerCase() + '>';
                     return html;
                 }
-                const dialog = findDialog(document);
-                return dialog ? serialize(dialog, 0) : '<NO DIALOG FOUND>';
+                return serialize(anchor, 0);
             }""")
             with open(f"{debug_dir}/debug_full_dialog.html", "w") as f:
                 f.write(full_dialog_html)
-            print(f"Saved full dialog (with shadow roots) ({len(full_dialog_html)} bytes)")
+            print(f"Saved full dialog with shadow subtrees ({len(full_dialog_html)} bytes)")
         except Exception as e:
             print(f"Full dialog dump failed: {e}")
+
+        # Also capture all radio/checkbox/input/select names inside the dialog.
+        try:
+            inputs_summary = page.get_by_text("Details Only", exact=True).first.evaluate("""el => {
+                let node = el;
+                while (node) {
+                    const root = node.getRootNode();
+                    if (root instanceof ShadowRoot) node = root.host;
+                    else break;
+                }
+                let anchor = node;
+                for (let i=0;i<6 && anchor.parentElement;i++) anchor = anchor.parentElement;
+                function* walk(root, depth) {
+                    if (!root || depth > 15) return;
+                    for (const c of (root.children||[])) {
+                        if (c.tagName === 'INPUT' || c.tagName === 'SELECT' || c.tagName === 'BUTTON') {
+                            yield {
+                                tag: c.tagName,
+                                type: c.type,
+                                name: c.name,
+                                value: (c.value||'').slice(0,60),
+                                aria: c.getAttribute('aria-label'),
+                                text: (c.textContent||'').trim().slice(0,60),
+                                checked: c.checked,
+                                disabled: c.disabled
+                            };
+                        }
+                        yield* walk(c, depth+1);
+                        if (c.shadowRoot) yield* walk(c.shadowRoot, depth+1);
+                    }
+                }
+                return JSON.stringify(Array.from(walk(anchor, 0)), null, 2);
+            }""")
+            with open(f"{debug_dir}/debug_inputs.json", "w") as f:
+                f.write(inputs_summary)
+            print(f"Saved inputs summary ({len(inputs_summary)} bytes)")
+        except Exception as e:
+            print(f"Inputs dump failed: {e}")
 
         # Dump the HTML of the ancestor chain of the "Details Only" text using
         # Playwright's locator (which pierces Shadow DOM).
