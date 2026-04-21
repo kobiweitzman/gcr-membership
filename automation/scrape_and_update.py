@@ -184,6 +184,64 @@ def scrape_membership_export():
         except Exception:
             pass
 
+        # Dump ALL shadow DOM starting from the "Details Only" text element
+        # upwards, so we can see the entire dialog structure including nested
+        # shadow roots (where the report row-limit control likely lives).
+        try:
+            full_dialog_html = page.evaluate("""() => {
+                // Walk shadow DOM recursively to find a dialog that contains
+                // "Details Only" text, then serialize it with shadow roots inlined.
+                function findDialog(root) {
+                    if (!root) return null;
+                    const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
+                    let n;
+                    while ((n = walker.nextNode())) {
+                        if ((n.getAttribute && n.getAttribute('role') === 'dialog') ||
+                            n.classList?.contains('slds-modal') ||
+                            n.tagName === 'SECTION' && n.textContent?.includes('Details Only')) {
+                            if (n.textContent?.includes('Details Only')) return n;
+                        }
+                        if (n.shadowRoot) {
+                            const hit = findDialog(n.shadowRoot);
+                            if (hit) return hit;
+                        }
+                    }
+                    return null;
+                }
+                function serialize(el, depth) {
+                    if (depth > 20) return '<TRUNCATED>';
+                    if (!el) return '';
+                    let html = '<' + el.tagName.toLowerCase();
+                    for (const attr of el.attributes || []) {
+                        html += ' ' + attr.name + '=\"' + (attr.value || '').replace(/\"/g,'&quot;').slice(0,200) + '\"';
+                    }
+                    html += '>';
+                    if (el.shadowRoot) {
+                        html += '<!-- SHADOW -->';
+                        for (const child of el.shadowRoot.children) {
+                            html += serialize(child, depth+1);
+                        }
+                        html += '<!-- /SHADOW -->';
+                    }
+                    for (const child of el.children || []) {
+                        html += serialize(child, depth+1);
+                    }
+                    const txt = el.childNodes && Array.from(el.childNodes)
+                        .filter(n => n.nodeType === 3)
+                        .map(n => n.textContent).join('').trim();
+                    if (txt) html += txt.slice(0, 200);
+                    html += '</' + el.tagName.toLowerCase() + '>';
+                    return html;
+                }
+                const dialog = findDialog(document);
+                return dialog ? serialize(dialog, 0) : '<NO DIALOG FOUND>';
+            }""")
+            with open(f"{debug_dir}/debug_full_dialog.html", "w") as f:
+                f.write(full_dialog_html)
+            print(f"Saved full dialog (with shadow roots) ({len(full_dialog_html)} bytes)")
+        except Exception as e:
+            print(f"Full dialog dump failed: {e}")
+
         # Dump the HTML of the ancestor chain of the "Details Only" text using
         # Playwright's locator (which pierces Shadow DOM).
         try:
