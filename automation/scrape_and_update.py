@@ -177,23 +177,61 @@ def scrape_membership_export():
         # The dialog defaults to "Formatted Report", which only exports the
         # ~30 rows currently rendered in the report preview. "Details Only"
         # exports every row. Without this, we get 30 members instead of ~994.
-        print("Selecting 'Details Only' export option...")
+        debug_dir = os.environ.get("DEBUG_ARTIFACT_DIR", "/tmp")
+
+        # Dump the VISIBLE dialog's HTML (skip hidden Aura error dialog).
         try:
-            details_card = page.locator(
-                "text=Details Only, "
-                "label:has-text('Details Only'), "
-                "[aria-label='Details Only']"
-            ).first
-            details_card.click(timeout=10000)
-            page.wait_for_timeout(500)
-            print("Selected 'Details Only'.")
+            visible_dialog_html = page.evaluate("""() => {
+                const dialogs = Array.from(document.querySelectorAll(
+                    "section[role='dialog'], div[role='dialog'], .slds-modal, .avonni-modal"
+                ));
+                for (const d of dialogs) {
+                    const style = window.getComputedStyle(d);
+                    const rect = d.getBoundingClientRect();
+                    if (style.display !== 'none' && style.visibility !== 'hidden'
+                        && rect.width > 0 && rect.height > 0) {
+                        return d.outerHTML;
+                    }
+                }
+                return null;
+            }""")
+            if visible_dialog_html:
+                with open(f"{debug_dir}/debug_visible_dialog.html", "w") as f:
+                    f.write(visible_dialog_html)
+                print(f"Saved visible dialog HTML ({len(visible_dialog_html)} bytes)")
         except Exception as e:
-            print(f"WARNING: Could not select 'Details Only' card: {e}")
-            debug_dir = os.environ.get("DEBUG_ARTIFACT_DIR", "/tmp")
+            print(f"Visible dialog dump failed: {e}")
+
+        print("Selecting 'Details Only' export option...")
+        selectors = [
+            "text=Details Only",
+            "label:has-text('Details Only')",
+            "span:has-text('Details Only')",
+            "div:has-text('Details Only')",
+            "[aria-label*='Details Only']",
+            "h3:has-text('Details Only')",
+            "*[title='Details Only']",
+        ]
+        clicked = False
+        for sel in selectors:
+            try:
+                loc = page.locator(sel).first
+                if loc.count() > 0:
+                    loc.click(timeout=3000)
+                    print(f"  Clicked via selector: {sel}")
+                    clicked = True
+                    break
+            except Exception as e:
+                print(f"  Selector {sel!r} failed: {e}")
+
+        if not clicked:
+            print("WARNING: Could not click 'Details Only' via any selector.")
             try:
                 page.screenshot(path=f"{debug_dir}/debug_no_details_card.png", full_page=True)
             except Exception:
                 pass
+        else:
+            page.wait_for_timeout(500)
 
         # --- Click the Export button inside the dialog (the brand/primary button) ---
         print("Clicking Export in dialog...")
