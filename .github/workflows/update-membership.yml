@@ -26,23 +26,10 @@ jobs:
           playwright install chromium
           playwright install-deps chromium
 
-      - name: Create debug artifact directory
-        run: mkdir -p debug-artifacts
-
       - name: Run membership scraper
         env:
           BBYO_EMAIL: ${{ secrets.BBYO_EMAIL }}
           BBYO_PASSWORD: ${{ secrets.BBYO_PASSWORD }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          DEBUG_ARTIFACT_DIR: ${{ github.workspace }}/debug-artifacts
         run: python automation/scrape_and_update.py
-
-      - name: Upload debug artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: scraper-debug
-          path: debug-artifacts/
-          if-no-files-found: ignore
-          retention-days: 7
