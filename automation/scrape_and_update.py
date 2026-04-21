@@ -179,85 +179,81 @@ def scrape_membership_export():
         # exports every row. Without this, we get 30 members instead of ~994.
         debug_dir = os.environ.get("DEBUG_ARTIFACT_DIR", "/tmp")
 
-        # Always dump every element containing "Details Only" so we see the DOM.
-        try:
-            details_html = page.evaluate("""() => {
-                const all = Array.from(document.querySelectorAll("*"));
-                const hits = [];
-                for (const el of all) {
-                    if (el.children.length === 0 && el.textContent &&
-                        el.textContent.trim() === 'Details Only') {
-                        hits.push({
-                            tag: el.tagName,
-                            classes: el.className,
-                            parentTag: el.parentElement?.tagName,
-                            parentClasses: el.parentElement?.className,
-                            grandparentTag: el.parentElement?.parentElement?.tagName,
-                            grandparentClasses: el.parentElement?.parentElement?.className,
-                            outerHTML: el.parentElement?.parentElement?.outerHTML?.slice(0, 2000)
-                        });
-                    }
-                }
-                return JSON.stringify(hits, null, 2);
-            }""")
-            with open(f"{debug_dir}/debug_details_hits.json", "w") as f:
-                f.write(details_html)
-            print(f"Saved 'Details Only' DOM hits ({len(details_html)} bytes)")
-        except Exception as e:
-            print(f"Details Only DOM dump failed: {e}")
-
-        # Always screenshot before clicking.
         try:
             page.screenshot(path=f"{debug_dir}/debug_before_details_click.png", full_page=True)
         except Exception:
             pass
 
-        print("Selecting 'Details Only' export option...")
-        # In Avonni visual-picker, the clickable target is usually a <label>
-        # whose `for` attribute points to a hidden radio input. Clicking the
-        # text span doesn't toggle selection — need the label or input.
-        clicked = False
+        # Dump the HTML of the ancestor chain of the "Details Only" text using
+        # Playwright's locator (which pierces Shadow DOM).
         try:
-            # Find the radio input by walking from the "Details Only" text to
-            # the enclosing label/figure, then click the figure (or its input).
-            selected = page.evaluate("""() => {
-                const all = Array.from(document.querySelectorAll("*"));
-                for (const el of all) {
-                    if (el.children.length === 0 && el.textContent?.trim() === 'Details Only') {
-                        // Walk up looking for a label or radio-bearing ancestor.
-                        let node = el;
-                        for (let i = 0; i < 8 && node; i++) {
-                            if (node.tagName === 'LABEL') {
-                                node.scrollIntoView();
-                                node.click();
-                                return 'label';
-                            }
-                            const input = node.querySelector?.('input[type="radio"]');
-                            if (input) {
-                                input.scrollIntoView();
-                                input.click();
-                                return 'radio';
-                            }
-                            node = node.parentElement;
-                        }
-                        // Fallback: click the text element itself.
-                        el.click();
-                        return 'text';
-                    }
-                }
-                return null;
-            }""")
-            if selected:
-                print(f"  Clicked 'Details Only' via: {selected}")
-                clicked = True
+            details_text_loc = page.get_by_text("Details Only", exact=True).first
+            if details_text_loc.count() > 0:
+                ancestor_html = details_text_loc.evaluate(
+                    "el => { let n = el; for (let i=0;i<12 && n;i++) {"
+                    " if (n.querySelector && (n.querySelector('input[type=\"radio\"]')"
+                    " || n.tagName==='LABEL')) return n.outerHTML.slice(0, 4000); n = n.parentElement; }"
+                    " return el.outerHTML; }"
+                )
+                with open(f"{debug_dir}/debug_details_ancestor.html", "w") as f:
+                    f.write(ancestor_html)
+                print(f"Saved Details Only ancestor HTML ({len(ancestor_html)} bytes)")
             else:
-                print("  WARNING: Could not locate 'Details Only' text node.")
+                print("Could not find 'Details Only' text via get_by_text.")
         except Exception as e:
-            print(f"  DOM-walk click failed: {e}")
+            print(f"Ancestor dump failed: {e}")
 
-        page.wait_for_timeout(1000)
+        print("Selecting 'Details Only' export option...")
+        clicked_via = None
 
-        # Screenshot after clicking so we can see if selection changed.
+        # Strategy 1: radio role
+        try:
+            radio = page.get_by_role("radio", name="Details Only")
+            if radio.count() > 0:
+                radio.first.check(timeout=5000)
+                clicked_via = "role=radio check()"
+        except Exception as e:
+            print(f"  role=radio failed: {e}")
+
+        # Strategy 2: click the label ancestor of the text
+        if not clicked_via:
+            try:
+                result = page.get_by_text("Details Only", exact=True).first.evaluate(
+                    "el => { let n = el; for (let i=0;i<12 && n;i++) {"
+                    " if (n.tagName==='LABEL') { n.click(); return 'LABEL'; }"
+                    " const r = n.querySelector && n.querySelector('input[type=\"radio\"]');"
+                    " if (r) { r.click(); return 'RADIO-INPUT'; } n = n.parentElement; } return null; }"
+                )
+                if result:
+                    clicked_via = f"ancestor-click: {result}"
+            except Exception as e:
+                print(f"  ancestor-click failed: {e}")
+
+        # Strategy 3: click the parent figure element
+        if not clicked_via:
+            try:
+                page.get_by_text("Details Only", exact=True).first.locator(
+                    "xpath=ancestor::*[contains(@class,'visual-picker') or contains(@class,'slds-visual-picker')][1]"
+                ).click(timeout=5000)
+                clicked_via = "xpath ancestor visual-picker"
+            except Exception as e:
+                print(f"  visual-picker ancestor failed: {e}")
+
+        # Strategy 4: force-click the text itself
+        if not clicked_via:
+            try:
+                page.get_by_text("Details Only", exact=True).first.click(force=True, timeout=5000)
+                clicked_via = "force click text"
+            except Exception as e:
+                print(f"  force-click failed: {e}")
+
+        if clicked_via:
+            print(f"  Clicked 'Details Only' via: {clicked_via}")
+        else:
+            print("  WARNING: All 'Details Only' click strategies failed.")
+
+        page.wait_for_timeout(1500)
+
         try:
             page.screenshot(path=f"{debug_dir}/debug_after_details_click.png", full_page=True)
         except Exception:
