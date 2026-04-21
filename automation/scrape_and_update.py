@@ -173,202 +173,29 @@ def scrape_membership_export():
             page.screenshot(path="/tmp/debug_export_dialog.png")
             page.wait_for_timeout(3000)
 
-        # --- Select "Details Only" so ALL rows are exported ---
-        # The dialog defaults to "Formatted Report", which only exports the
-        # ~30 rows currently rendered in the report preview. "Details Only"
-        # exports every row. Without this, we get 30 members instead of ~994.
-        debug_dir = os.environ.get("DEBUG_ARTIFACT_DIR", "/tmp")
-
+        # --- Configure the Avonni Export dialog so ALL rows export ---
+        # Dialog defaults to "Formatted Report" with "Export all data" OFF,
+        # which caps the download at the ~30-row report preview. We need:
+        #   1. Click the "Details Only" card (via visual-picker ancestor,
+        #      since the radio lives in a nested shadow root).
+        #   2. Toggle ON the "Export all data" switch.
+        print("Selecting 'Details Only'...")
         try:
-            page.screenshot(path=f"{debug_dir}/debug_before_details_click.png", full_page=True)
-        except Exception:
-            pass
-
-        # Starting from the "Details Only" text (which Playwright finds by
-        # piercing shadow DOM), walk UP via getRootNode().host to escape nested
-        # shadow roots, then serialize from the outermost ancestor downwards
-        # including all shadow subtrees.
-        try:
-            full_dialog_html = page.get_by_text("Details Only", exact=True).first.evaluate("""el => {
-                // Walk up through shadow boundaries to find the outermost shadow host.
-                let node = el;
-                let hosts = [];
-                while (node) {
-                    const root = node.getRootNode();
-                    if (root instanceof ShadowRoot) {
-                        hosts.push(root.host);
-                        node = root.host;
-                    } else {
-                        break;
-                    }
-                }
-                // Take the highest ancestor (outermost shadow host) and go up
-                // a few more levels in the light DOM to capture the whole modal.
-                let anchor = hosts.length ? hosts[hosts.length - 1] : el;
-                for (let i = 0; i < 6 && anchor.parentElement; i++) {
-                    anchor = anchor.parentElement;
-                }
-                function serialize(el, depth) {
-                    if (depth > 15) return '<T>';
-                    if (!el || !el.tagName) return '';
-                    let html = '<' + el.tagName.toLowerCase();
-                    for (const attr of el.attributes || []) {
-                        html += ' ' + attr.name + '="' + (attr.value||'').replace(/"/g,'&quot;').slice(0,120) + '"';
-                    }
-                    html += '>';
-                    if (el.shadowRoot) {
-                        html += '<!--SHADOW-->';
-                        for (const c of el.shadowRoot.children) html += serialize(c, depth+1);
-                        html += '<!--/SHADOW-->';
-                    }
-                    for (const c of el.childNodes || []) {
-                        if (c.nodeType === 1) html += serialize(c, depth+1);
-                        else if (c.nodeType === 3 && c.textContent.trim()) html += c.textContent.trim().slice(0,100);
-                    }
-                    html += '</' + el.tagName.toLowerCase() + '>';
-                    return html;
-                }
-                return serialize(anchor, 0);
-            }""")
-            with open(f"{debug_dir}/debug_full_dialog.html", "w") as f:
-                f.write(full_dialog_html)
-            print(f"Saved full dialog with shadow subtrees ({len(full_dialog_html)} bytes)")
+            page.get_by_text("Details Only", exact=True).first.locator(
+                "xpath=ancestor::*[contains(@class,'visual-picker') or contains(@class,'slds-visual-picker')][1]"
+            ).click(timeout=10000)
         except Exception as e:
-            print(f"Full dialog dump failed: {e}")
-
-        # Also capture all radio/checkbox/input/select names inside the dialog.
-        try:
-            inputs_summary = page.get_by_text("Details Only", exact=True).first.evaluate("""el => {
-                let node = el;
-                while (node) {
-                    const root = node.getRootNode();
-                    if (root instanceof ShadowRoot) node = root.host;
-                    else break;
-                }
-                let anchor = node;
-                for (let i=0;i<6 && anchor.parentElement;i++) anchor = anchor.parentElement;
-                function* walk(root, depth) {
-                    if (!root || depth > 15) return;
-                    for (const c of (root.children||[])) {
-                        if (c.tagName === 'INPUT' || c.tagName === 'SELECT' || c.tagName === 'BUTTON') {
-                            yield {
-                                tag: c.tagName,
-                                type: c.type,
-                                name: c.name,
-                                value: (c.value||'').slice(0,60),
-                                aria: c.getAttribute('aria-label'),
-                                text: (c.textContent||'').trim().slice(0,60),
-                                checked: c.checked,
-                                disabled: c.disabled
-                            };
-                        }
-                        yield* walk(c, depth+1);
-                        if (c.shadowRoot) yield* walk(c.shadowRoot, depth+1);
-                    }
-                }
-                return JSON.stringify(Array.from(walk(anchor, 0)), null, 2);
-            }""")
-            with open(f"{debug_dir}/debug_inputs.json", "w") as f:
-                f.write(inputs_summary)
-            print(f"Saved inputs summary ({len(inputs_summary)} bytes)")
-        except Exception as e:
-            print(f"Inputs dump failed: {e}")
-
-        # Dump the HTML of the ancestor chain of the "Details Only" text using
-        # Playwright's locator (which pierces Shadow DOM).
-        try:
-            details_text_loc = page.get_by_text("Details Only", exact=True).first
-            if details_text_loc.count() > 0:
-                ancestor_html = details_text_loc.evaluate(
-                    "el => { let n = el; for (let i=0;i<12 && n;i++) {"
-                    " if (n.querySelector && (n.querySelector('input[type=\"radio\"]')"
-                    " || n.tagName==='LABEL')) return n.outerHTML.slice(0, 4000); n = n.parentElement; }"
-                    " return el.outerHTML; }"
-                )
-                with open(f"{debug_dir}/debug_details_ancestor.html", "w") as f:
-                    f.write(ancestor_html)
-                print(f"Saved Details Only ancestor HTML ({len(ancestor_html)} bytes)")
-            else:
-                print("Could not find 'Details Only' text via get_by_text.")
-        except Exception as e:
-            print(f"Ancestor dump failed: {e}")
-
-        print("Selecting 'Details Only' export option...")
-        clicked_via = None
-
-        # Strategy 1: radio role
-        try:
-            radio = page.get_by_role("radio", name="Details Only")
-            if radio.count() > 0:
-                radio.first.check(timeout=5000)
-                clicked_via = "role=radio check()"
-        except Exception as e:
-            print(f"  role=radio failed: {e}")
-
-        # Strategy 2: click the label ancestor of the text
-        if not clicked_via:
-            try:
-                result = page.get_by_text("Details Only", exact=True).first.evaluate(
-                    "el => { let n = el; for (let i=0;i<12 && n;i++) {"
-                    " if (n.tagName==='LABEL') { n.click(); return 'LABEL'; }"
-                    " const r = n.querySelector && n.querySelector('input[type=\"radio\"]');"
-                    " if (r) { r.click(); return 'RADIO-INPUT'; } n = n.parentElement; } return null; }"
-                )
-                if result:
-                    clicked_via = f"ancestor-click: {result}"
-            except Exception as e:
-                print(f"  ancestor-click failed: {e}")
-
-        # Strategy 3: click the parent figure element
-        if not clicked_via:
-            try:
-                page.get_by_text("Details Only", exact=True).first.locator(
-                    "xpath=ancestor::*[contains(@class,'visual-picker') or contains(@class,'slds-visual-picker')][1]"
-                ).click(timeout=5000)
-                clicked_via = "xpath ancestor visual-picker"
-            except Exception as e:
-                print(f"  visual-picker ancestor failed: {e}")
-
-        # Strategy 4: force-click the text itself
-        if not clicked_via:
-            try:
-                page.get_by_text("Details Only", exact=True).first.click(force=True, timeout=5000)
-                clicked_via = "force click text"
-            except Exception as e:
-                print(f"  force-click failed: {e}")
-
-        if clicked_via:
-            print(f"  Clicked 'Details Only' via: {clicked_via}")
-        else:
-            print("  WARNING: All 'Details Only' click strategies failed.")
-
-        page.wait_for_timeout(1500)
-
-        try:
-            page.screenshot(path=f"{debug_dir}/debug_after_details_click.png", full_page=True)
-        except Exception:
-            pass
-
-        # --- Enable "Export all data" toggle ---
-        # Without this, the export is capped to the 30-row preview even when
-        # "Details Only" is selected.
-        print("Enabling 'Export all data' toggle...")
-        try:
-            toggle_label = page.get_by_text("Export all data", exact=True).first
-            if toggle_label.count() > 0:
-                toggle_label.click(timeout=5000)
-                print("  Clicked 'Export all data' label.")
-            else:
-                print("  WARNING: 'Export all data' label not found.")
-        except Exception as e:
-            print(f"  WARNING: Export-all-data click failed: {e}")
+            print(f"  WARNING: Could not click 'Details Only' card: {e}")
 
         page.wait_for_timeout(500)
 
+        print("Enabling 'Export all data' toggle...")
         try:
-            page.screenshot(path=f"{debug_dir}/debug_after_export_all_click.png", full_page=True)
-        except Exception:
-            pass
+            page.get_by_text("Export all data", exact=True).first.click(timeout=10000)
+        except Exception as e:
+            print(f"  WARNING: Could not click 'Export all data' toggle: {e}")
+
+        page.wait_for_timeout(500)
 
         # --- Click the Export button inside the dialog (the brand/primary button) ---
         print("Clicking Export in dialog...")
