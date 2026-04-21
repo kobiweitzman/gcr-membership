@@ -179,59 +179,89 @@ def scrape_membership_export():
         # exports every row. Without this, we get 30 members instead of ~994.
         debug_dir = os.environ.get("DEBUG_ARTIFACT_DIR", "/tmp")
 
-        # Dump the VISIBLE dialog's HTML (skip hidden Aura error dialog).
+        # Always dump every element containing "Details Only" so we see the DOM.
         try:
-            visible_dialog_html = page.evaluate("""() => {
-                const dialogs = Array.from(document.querySelectorAll(
-                    "section[role='dialog'], div[role='dialog'], .slds-modal, .avonni-modal"
-                ));
-                for (const d of dialogs) {
-                    const style = window.getComputedStyle(d);
-                    const rect = d.getBoundingClientRect();
-                    if (style.display !== 'none' && style.visibility !== 'hidden'
-                        && rect.width > 0 && rect.height > 0) {
-                        return d.outerHTML;
+            details_html = page.evaluate("""() => {
+                const all = Array.from(document.querySelectorAll("*"));
+                const hits = [];
+                for (const el of all) {
+                    if (el.children.length === 0 && el.textContent &&
+                        el.textContent.trim() === 'Details Only') {
+                        hits.push({
+                            tag: el.tagName,
+                            classes: el.className,
+                            parentTag: el.parentElement?.tagName,
+                            parentClasses: el.parentElement?.className,
+                            grandparentTag: el.parentElement?.parentElement?.tagName,
+                            grandparentClasses: el.parentElement?.parentElement?.className,
+                            outerHTML: el.parentElement?.parentElement?.outerHTML?.slice(0, 2000)
+                        });
+                    }
+                }
+                return JSON.stringify(hits, null, 2);
+            }""")
+            with open(f"{debug_dir}/debug_details_hits.json", "w") as f:
+                f.write(details_html)
+            print(f"Saved 'Details Only' DOM hits ({len(details_html)} bytes)")
+        except Exception as e:
+            print(f"Details Only DOM dump failed: {e}")
+
+        # Always screenshot before clicking.
+        try:
+            page.screenshot(path=f"{debug_dir}/debug_before_details_click.png", full_page=True)
+        except Exception:
+            pass
+
+        print("Selecting 'Details Only' export option...")
+        # In Avonni visual-picker, the clickable target is usually a <label>
+        # whose `for` attribute points to a hidden radio input. Clicking the
+        # text span doesn't toggle selection — need the label or input.
+        clicked = False
+        try:
+            # Find the radio input by walking from the "Details Only" text to
+            # the enclosing label/figure, then click the figure (or its input).
+            selected = page.evaluate("""() => {
+                const all = Array.from(document.querySelectorAll("*"));
+                for (const el of all) {
+                    if (el.children.length === 0 && el.textContent?.trim() === 'Details Only') {
+                        // Walk up looking for a label or radio-bearing ancestor.
+                        let node = el;
+                        for (let i = 0; i < 8 && node; i++) {
+                            if (node.tagName === 'LABEL') {
+                                node.scrollIntoView();
+                                node.click();
+                                return 'label';
+                            }
+                            const input = node.querySelector?.('input[type="radio"]');
+                            if (input) {
+                                input.scrollIntoView();
+                                input.click();
+                                return 'radio';
+                            }
+                            node = node.parentElement;
+                        }
+                        // Fallback: click the text element itself.
+                        el.click();
+                        return 'text';
                     }
                 }
                 return null;
             }""")
-            if visible_dialog_html:
-                with open(f"{debug_dir}/debug_visible_dialog.html", "w") as f:
-                    f.write(visible_dialog_html)
-                print(f"Saved visible dialog HTML ({len(visible_dialog_html)} bytes)")
+            if selected:
+                print(f"  Clicked 'Details Only' via: {selected}")
+                clicked = True
+            else:
+                print("  WARNING: Could not locate 'Details Only' text node.")
         except Exception as e:
-            print(f"Visible dialog dump failed: {e}")
+            print(f"  DOM-walk click failed: {e}")
 
-        print("Selecting 'Details Only' export option...")
-        selectors = [
-            "text=Details Only",
-            "label:has-text('Details Only')",
-            "span:has-text('Details Only')",
-            "div:has-text('Details Only')",
-            "[aria-label*='Details Only']",
-            "h3:has-text('Details Only')",
-            "*[title='Details Only']",
-        ]
-        clicked = False
-        for sel in selectors:
-            try:
-                loc = page.locator(sel).first
-                if loc.count() > 0:
-                    loc.click(timeout=3000)
-                    print(f"  Clicked via selector: {sel}")
-                    clicked = True
-                    break
-            except Exception as e:
-                print(f"  Selector {sel!r} failed: {e}")
+        page.wait_for_timeout(1000)
 
-        if not clicked:
-            print("WARNING: Could not click 'Details Only' via any selector.")
-            try:
-                page.screenshot(path=f"{debug_dir}/debug_no_details_card.png", full_page=True)
-            except Exception:
-                pass
-        else:
-            page.wait_for_timeout(500)
+        # Screenshot after clicking so we can see if selection changed.
+        try:
+            page.screenshot(path=f"{debug_dir}/debug_after_details_click.png", full_page=True)
+        except Exception:
+            pass
 
         # --- Click the Export button inside the dialog (the brand/primary button) ---
         print("Clicking Export in dialog...")
