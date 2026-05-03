@@ -95,6 +95,24 @@ def scrape_membership_export():
         print("Logging in... waiting for redirect...")
         page.wait_for_timeout(5000)
 
+        # Detect Salesforce's forced password-rotation redirect — the bot
+        # cannot proceed past this; the user must rotate the password
+        # manually and update the BBYO_PASSWORD GitHub secret.
+        if "ChangePassword" in page.url:
+            print("=" * 60)
+            print("ERROR: BBYO password expired — Salesforce is forcing a")
+            print("password change. The scraper cannot continue.")
+            print("")
+            print("To fix:")
+            print("  1. Log in manually at https://bbyo.my.site.com/s/login")
+            print("  2. Set a new password on the Change Password page")
+            print("  3. Update the BBYO_PASSWORD secret in GitHub:")
+            print("     Settings -> Secrets and variables -> Actions")
+            print("=" * 60)
+            print(f"Current URL: {page.url}")
+            browser.close()
+            sys.exit(1)
+
         # Wait for login to complete - look for the navigation bar
         try:
             page.wait_for_selector("text=My Chapter", timeout=30000)
@@ -102,6 +120,14 @@ def scrape_membership_export():
         except Exception:
             # Try waiting a bit more
             page.wait_for_timeout(5000)
+            if "ChangePassword" in page.url:
+                print("=" * 60)
+                print("ERROR: BBYO password expired — Salesforce is forcing a")
+                print("password change. See README/scraper for fix steps.")
+                print("=" * 60)
+                print(f"Current URL: {page.url}")
+                browser.close()
+                sys.exit(1)
             if "login" in page.url.lower():
                 print("ERROR: Login appears to have failed. Check credentials.")
                 print(f"Current URL: {page.url}")
