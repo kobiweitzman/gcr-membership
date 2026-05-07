@@ -129,10 +129,11 @@
 
   h1.title {
     margin: 0;
+    padding-bottom: 0.18em; /* room for descenders (g, y) */
     font-weight: 900;
     letter-spacing: -0.02em;
     font-size: clamp(44px, 9vw, 132px);
-    line-height: 0.95;
+    line-height: 1.08;
     background: linear-gradient(110deg,
       var(--accent-1) 0%,
       var(--accent-4) 25%,
@@ -221,19 +222,6 @@
     100% { transform: translateY(110vh) rotate(720deg); opacity: 0.9; }
   }
 
-  /* ——— trophy emoji at top ——— */
-  .crown {
-    font-size: clamp(48px, 7vw, 84px);
-    margin-bottom: 8px;
-    filter: drop-shadow(0 6px 24px rgba(255,216,107,0.6));
-    animation: bob 3.5s ease-in-out infinite;
-    display: inline-block;
-  }
-  @keyframes bob {
-    0%,100% { transform: translateY(0) rotate(-3deg); }
-    50%     { transform: translateY(-10px) rotate(3deg); }
-  }
-
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation: none !important; }
   }
@@ -249,7 +237,6 @@
 <div class="confetti" id="confetti"></div>
 
 <main class="stage" role="main">
-  <div class="crown">🏆</div>
   <div class="eyebrow">Gold Coast Region · BBYO</div>
   <h1 class="title">Thanks for a<br>great year!</h1>
   <div class="hr"></div>
