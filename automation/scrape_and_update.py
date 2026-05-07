@@ -131,7 +131,7 @@ def scrape_membership_export():
             if "login" in page.url.lower():
                 print("ERROR: Login appears to have failed. Check credentials.")
                 print(f"Current URL: {page.url}")
-                page.screenshot(path="/tmp/debug_login_fail.png")
+                page.screenshot(path=f'{os.environ.get("DEBUG_ARTIFACT_DIR", "/tmp")}/debug_login_fail.png')
                 browser.close()
                 sys.exit(1)
             print("Login appears successful (redirected away from login page).")
@@ -153,7 +153,14 @@ def scrape_membership_export():
                 print("Found Export button — page is loaded.")
             except Exception:
                 print("Warning: Could not confirm page load. Taking debug screenshot...")
-                page.screenshot(path="/tmp/debug_my_chapter.png")
+                page.screenshot(path=f'{os.environ.get("DEBUG_ARTIFACT_DIR", "/tmp")}/debug_my_chapter.png')
+                try:
+                    body_html = page.evaluate("() => document.body.outerHTML")
+                    with open(f'{os.environ.get("DEBUG_ARTIFACT_DIR", "/tmp")}/debug_my_chapter_body.html', "w") as f:
+                        f.write(body_html)
+                    print(f"Saved body HTML ({len(body_html)} bytes)")
+                except Exception as e:
+                    print(f"Body dump failed: {e}")
                 print(f"Current URL: {page.url}")
                 page.wait_for_timeout(5000)
 
@@ -173,7 +180,7 @@ def scrape_membership_export():
         except Exception:
             print("Warning: Could not detect table rows. Waiting extra time...")
             page.wait_for_timeout(10000)
-            page.screenshot(path="/tmp/debug_no_table_rows.png")
+            page.screenshot(path=f'{os.environ.get("DEBUG_ARTIFACT_DIR", "/tmp")}/debug_no_table_rows.png')
 
         # --- Click Export button (the one on the page, not in dialog) ---
         print("Clicking Export button...")
@@ -182,7 +189,14 @@ def scrape_membership_export():
             export_btn.wait_for(timeout=15000)
         except Exception:
             print("Export button not found. Taking debug screenshot...")
-            page.screenshot(path="/tmp/debug_no_export_btn.png")
+            page.screenshot(path=f'{os.environ.get("DEBUG_ARTIFACT_DIR", "/tmp")}/debug_no_export_btn.png', full_page=True)
+            try:
+                body_html = page.evaluate("() => document.body.outerHTML")
+                with open(f'{os.environ.get("DEBUG_ARTIFACT_DIR", "/tmp")}/debug_no_export_btn_body.html', "w") as f:
+                    f.write(body_html)
+                print(f"Saved body HTML on export-not-found ({len(body_html)} bytes)")
+            except Exception as e:
+                print(f"Body dump failed: {e}")
             browser.close()
             sys.exit(1)
 
@@ -196,7 +210,7 @@ def scrape_membership_export():
             print("Export dialog opened.")
         except Exception:
             print("Warning: Export dialog may not have opened properly.")
-            page.screenshot(path="/tmp/debug_export_dialog.png")
+            page.screenshot(path=f'{os.environ.get("DEBUG_ARTIFACT_DIR", "/tmp")}/debug_export_dialog.png')
             page.wait_for_timeout(3000)
 
         # --- Configure the Avonni Export dialog so ALL rows export ---
