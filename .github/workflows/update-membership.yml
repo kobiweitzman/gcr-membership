@@ -1,9 +1,12 @@
 name: Update Membership Data
 
 on:
-  schedule:
-    # Runs once every hour
-    - cron: "0 * * * *"
+  # Hourly cron disabled — BBYO Salesforce community page (/s/my-chapter)
+  # has been throwing a JS error since May 4 2026 and the website no
+  # longer reads from this data anyway. Re-enable by uncommenting the
+  # schedule block below if BBYO ever fixes the page.
+  # schedule:
+  #   - cron: "0 * * * *"
   workflow_dispatch:
 
 jobs:
